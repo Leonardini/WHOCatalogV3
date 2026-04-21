@@ -94,6 +94,15 @@ applyThresholds = function(inputData, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet 
   return(inputData)
 }
 
+#' Apply MAF/quality thresholds, extract positions, and compute RRDR non-silent status
+#' @noRd
+applyVariantPostprocessing = function(inputData, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet = TRUE, minQ = QUALITY_THRESHOLD_STRICT, lowQHet = TRUE) {
+  inputData %>%
+    applyThresholds(minMAF = minMAF, lowMAFHet = lowMAFHet, minQ = minQ, lowQHet = lowQHet) %>%
+    extractPositions(colName = "mutation", maxNumber = 2L) %>%
+    computeRRDRInfo()
+}
+
 # This function computes the RRDR_NON_SILENT variable if necessary
 #' Compute RRDR (rifampicin resistance-determining region) information for each variant
 #' @noRd

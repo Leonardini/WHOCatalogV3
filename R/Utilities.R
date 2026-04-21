@@ -184,6 +184,9 @@ adjustDuplicateColumns = function(initTab, suffixes = c(".x", ".y"), warn = TRUE
   initTab
 }
 
+#' @noRd
+mergeCountColumns = function(initTab) adjustDuplicateColumns(initTab, warn = FALSE, add = TRUE)
+
 #' Prepare a masked dataset according to four criteria: synonymous, tier 2, neutral, and Pool
 #' Silent = TRUE masks silent variants; Tier2 = TRUE masks tier 2 variants; Neutral = TRUE masks
 #' neutral variants; Pool can be NA or a name masking corresponding poolable variants. SOnly = TRUE

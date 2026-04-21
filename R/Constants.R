@@ -75,7 +75,8 @@ POOLED_EFFECTS       = list(LoF = c(paste0(c("feature", "transcript"), "_ablatio
 INFRAME_EFFECTS      = paste0("inframe_", c("deletion", "insertion"))
 ADDITIONAL_EFFECTS   = c(POOLED_EFFECTS[["LoF"]], INFRAME_EFFECTS, "missense_variant")
 BDQ_EFFECTS          = c(ADDITIONAL_EFFECTS, "stop_lost")
-SILENT_EFFECTS       = c("initiator_codon_variant", "stop_retained_variant", "synonymous_variant")
+SILENT_EFFECTS          = c("initiator_codon_variant", "stop_retained_variant", "synonymous_variant")
+NEUTRAL_LOGICAL_COLUMNS = c(paste0("set", LETTERS[1:5]), "lit_mutation", "prev_version")
 UPSTREAM_VAR         = "upstream_gene_variant"
 INDEL_EFFECTS        = c(INFRAME_EFFECTS, paste0(c("feature", "transcript"), "_ablation"), "frameshift")
 

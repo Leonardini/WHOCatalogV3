@@ -28,11 +28,8 @@ assignEpiGroup = function(df, geneName) {
 summarizeEpiGroup = function(df, groupByCols, extraCols) {
   df %>%
     dplyr::filter(!is.na(Group)) %>%
-    group_by(across(all_of(groupByCols))) %>%
-    mutate(N = n()) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(all_of(c(groupByCols, extraCols, "N")))
+    group_by(across(all_of(c(groupByCols, extraCols)))) %>%
+    summarise(N = n(), .groups = "drop")
 }
 
 #' Compute sensitivity and specificity statistics for a catalogue against a dataset
@@ -251,10 +248,7 @@ computeSensSpec = function(fullDataset,
           }
           curTab %<>%
             group_by(selected, phenotype, drug) %>%
-            mutate(N = n_distinct(sample_id)) %>%
-            slice(1) %>%
-            ungroup() %>%
-            select(selected, phenotype, drug, N)
+            summarise(N = n_distinct(sample_id), .groups = "drop")
           finalTabs[[paste0("Lineage", Lineage, "_", "RIF", geno, "_", ifelse(relax, "Relaxed", "Regular"), "_", stage)]] = curTab
         }
       }
@@ -282,11 +276,9 @@ postprocessTabs = function(List, version, relaxed, sameRIF, minQ) {
       if (nrow(curTab) == 0) next
       curTab %<>%
         group_by(drug) %>%
-        mutate(TP = max(N * as.integer(selected & phenotype == "R")), TN = max(N * as.integer(!selected & phenotype == "S")),
-               FP = max(N * as.integer(selected & phenotype == "S")), FN = max(N * as.integer(!selected & phenotype == "R"))) %>%
-        slice(1) %>%
-        ungroup() %>%
-        select(-selected, -phenotype, -N) %>%
+        summarise(TP = max(N * as.integer(selected & phenotype == "R")), TN = max(N * as.integer(!selected & phenotype == "S")),
+                  FP = max(N * as.integer(selected & phenotype == "S")), FN = max(N * as.integer(!selected & phenotype == "R")),
+                  .groups = "drop") %>%
         mutate(group = curName, .before = 1)
       fullTab %<>%
         bind_rows(curTab)
@@ -313,11 +305,9 @@ postprocessTabs = function(List, version, relaxed, sameRIF, minQ) {
       }
       curTab %<>%
         group_by(criterion) %>%
-        mutate(LOF_R   = max(N * as.integer(Group == "A" & phenotype == "R")), LOF_S   = max(N * as.integer(Group == "A" & phenotype == "S")),
-               nomut_R = max(N * as.integer(Group == "B" & phenotype == "R")), nomut_S = max(N * as.integer(Group == "B" & phenotype == "S"))) %>%
-        slice(1) %>%
-        ungroup() %>%
-        select(-Group, -phenotype, -N) %>%
+        summarise(LOF_R   = max(N * as.integer(Group == "A" & phenotype == "R")), LOF_S   = max(N * as.integer(Group == "A" & phenotype == "S")),
+                  nomut_R = max(N * as.integer(Group == "B" & phenotype == "R")), nomut_S = max(N * as.integer(Group == "B" & phenotype == "S")),
+                  .groups = "drop") %>%
         mutate(group = curName, .before = 1)
       miniTab %<>%
         bind_rows(curTab)
@@ -340,9 +330,7 @@ postprocessTabs = function(List, version, relaxed, sameRIF, minQ) {
             slice(1) %>%
             ungroup() %>%
             group_by(relevant_MOI) %>%
-            mutate_at(c("mut_R", "mut_S", "mut_R_genoRIF", "mut_S_genoRIF"), sum) %>%
-            slice(1) %>%
-            select(relevant_MOI:mut_S_genoRIF) %>%
+            summarise(across(c(mut_R, mut_S, mut_R_genoRIF, mut_S_genoRIF), sum), .groups = "drop") %>%
             mutate(drug = curDrug, group = curName, .before = 1)
           miniTab %<>%
             bind_rows(curTab)

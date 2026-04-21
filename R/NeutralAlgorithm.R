@@ -86,7 +86,7 @@ neutralAlgorithm = function(masterTab, litTab,
     mutate(prev_version = FALSE)
   ## Convert the variable to a logical one
   masterTab %<>%
-    mutate_at(c("prev_version", paste0("set", LETTERS[1:5]), "lit_mutation"), convertToLogical)
+    mutate(across(all_of(NEUTRAL_LOGICAL_COLUMNS), convertToLogical))
   ## Create the overall list of mutations
   masterTab %<>%
     mutate(setF = (setC | setD | setE | prev_version))
@@ -119,10 +119,7 @@ computePPVs = function(inputTab, removeRM = TRUE, solo = FALSE, restrict = FALSE
   ## Compute the PPV and its confidence intervals for each variant-drug pair
   auxTab %<>%
     group_by(drug, variant) %>%
-    mutate(total = sum(!het), totalR = sum((!het) & phenotype == "R")) %>%
-    ## mutate(total = n(), totalR = sum(phenotype == "R")) %>%
-    slice(1) %>%
-    ungroup
+    summarise(total = sum(!het), totalR = sum((!het) & phenotype == "R"), .groups = "drop")
   PPVTab = auxTab %>%
     distinct(totalR, total, .keep_all = FALSE) %>%
     mutate(testResult = map2(totalR, total, safeBinomTest))

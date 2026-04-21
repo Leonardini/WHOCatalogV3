@@ -9,10 +9,7 @@ preprocessGenotypes = function(allGenotypes, minMAF = MAF_THRESHOLD_REGULAR, low
     mutate_at(c("mutation", "effect"), ~{replace_na(., "missing")}) %>%
     mutate(variant = ifelse(mutation == "missing", "missing", paste(gene, mutation, sep = "_"))) %>%
     ## Mark any genotype entry with a low MAF or a missing variant (i.e. a sequencing defect in the gene) as a het
-    applyThresholds(minMAF = minMAF, lowMAFHet = lowMAFHet, minQ = minQ, lowQHet = lowQHet) %>%
-    extractPositions(colName = "mutation", maxNumber = 2L) %>%
-    ## Marking non-silent variants in the RRDR_GENE with at least one of the two AAs in the RRDR (originally this was in Neutral.R)
-    computeRRDRInfo()
+    applyVariantPostprocessing(minMAF = minMAF, lowMAFHet = lowMAFHet, minQ = minQ, lowQHet = lowQHet)
 }
 
 #' Identify samples that fail quality control based on specific variant-drug combinations
@@ -37,32 +34,26 @@ annotateDatasets = function(fullDataset, samplesToExclude, allNeutrals) {
       ## Compute the per-drug denominators (number of R/S isolates screened for each drug); account for exclusion
       allDenominators = curSet %>%
         dplyr::filter(!(sample_id %in% samplesToExclude$sample_id)) %>%
+        distinct(drug, sample_id, phenotype) %>%
         group_by(drug) %>%
-        distinct(sample_id, .keep_all = TRUE) %>%
-        mutate(RDen = sum(phenotype == "R"), SDen = sum(phenotype == "S")) %>%
-        slice(1) %>%
-        ungroup() %>%
-        select(drug, RDen, SDen)
+        summarise(RDen = sum(phenotype == "R"), SDen = sum(phenotype == "S"), .groups = "drop")
       curSet %<>%
         inner_join(allDenominators, by = "drug")
       ## Adjust for the numbers of R/S isolates screened for each drug but excluded due to QC just for the bad pairs
       extraDenominators = curSet %>%
         dplyr::filter(sample_id %in% samplesToExclude$sample_id) %>%
+        distinct(drug, sample_id, phenotype) %>%
         group_by(drug) %>%
-        distinct(sample_id, .keep_all = TRUE) %>%
-        mutate(RDen = sum(phenotype == "R"), SDen = sum(phenotype == "S")) %>%
-        slice(1) %>%
-        ungroup() %>%
-        select(-variant) %>%
+        summarise(RDen = sum(phenotype == "R"), SDen = sum(phenotype == "S"), .groups = "drop") %>%
         inner_join(BAD_VAR_DRUG_PAIRS, by = "drug") %>%
         select(drug, variant, RDen, SDen)
       curSet %<>%
         left_join(extraDenominators, by = c("drug", "variant")) %>%
-        adjustDuplicateColumns(warn = FALSE, add = TRUE)
+        mergeCountColumns()
       ## Mark the neutral mutations and convert the neutral variable to a logical one
       curSet %<>%
         left_join(allNeutrals, by = c("drug", "variant")) %>%
-        mutate_at(c(paste0("set", LETTERS[1:5]), "lit_mutation", "prev_version", "neutral"), convertToLogical)
+        mutate(across(all_of(c(NEUTRAL_LOGICAL_COLUMNS, "neutral")), convertToLogical))
       ## And finally, replace into the full dataset
       fullDataset[[name]] = curSet
     }
@@ -84,10 +75,7 @@ computeExcludedCounts = function(curSet, samplesToExclude, datasetName) {
     dplyr::filter(!het) %>%
     inner_join(BAD_VAR_DRUG_PAIRS, by = c("drug", "variant")) %>%
     group_by(drug, variant) %>%
-    mutate(present_R = sum(phenotype == "R"), present_S = sum(phenotype == "S")) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(drug, variant, present_R, present_S)
+    summarise(present_R = sum(phenotype == "R"), present_S = sum(phenotype == "S"), .groups = "drop")
   curExtraOutputs = curExcludedEntries %>%
     prepMask(Silent = TRUE, Tier2 = TRUE, Neutral = TRUE, Pool = NA, SOnly = TRUE) %>%
     runSOLOPipeline(maxIter = 1L, stage = NULL, removeSOnly = FALSE)
@@ -119,10 +107,10 @@ computeVariantStats = function(curSet, curExtraCounts, curExtraSolos) {
     group_by(drug, variant) %>%
     mutate(present = n(), present_R = sum(phenotype == "R"), present_S = present - present_R) %>%
     left_join(curExtraCounts, by = c("drug", "variant")) %>%
-    adjustDuplicateColumns(warn = FALSE, add = TRUE) %>%
+    mergeCountColumns() %>%
     mutate(absent_R = RDen - present_R, absent_S = SDen - present_S) %>%
     left_join(curExtraSolos, by = c("drug", "variant")) %>%
-    adjustDuplicateColumns(warn = FALSE, add = TRUE) %>%
+    mergeCountColumns() %>%
     ungroup() %>%
     distinct(drug, variant, .keep_all = TRUE)
   ## Finally, complete the extraction and mark variants to FDR-correct for in SOLO and ALL modes, respectively.
@@ -145,11 +133,7 @@ adjustStatsForRemovedMutations = function(curStats, curDataset, mutationsToRemov
   extraDenominators = curDataset %>% ## TODO: Make sure that we only need to subtract non-het non-missing counts!
     dplyr::filter(stage == curStage & sample_id %in% extraIsolates & !het & variant != "missing") %>%
     group_by(drug, variant) %>%
-    mutate(present = n(), present_R = sum(phenotype == "R"), present_S = present - present_R) %>%
-    mutate_at(paste0('present', c('', '_R', '_S')), ~{multiply_by(., -1)}) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(drug, variant, starts_with('present'))
+    summarise(present = -n(), present_R = -sum(phenotype == "R"), present_S = -sum(phenotype == "S"), .groups = "drop")
   # Calculate SOLO counts to subtract (NEW) - suggested by Claude!
   extraSoloSubtract = tibble(drug = character(), variant = character(), SOLO_R = integer(), SOLO_S = integer())
   if (length(extraIsolates) > 0) {
@@ -166,9 +150,9 @@ adjustStatsForRemovedMutations = function(curStats, curDataset, mutationsToRemov
   curStats %>%
     mutate(RDen = present_R + absent_R, SDen = present_S + absent_S) %>%
     left_join(extraDenominators, by = c("drug", "variant")) %>%
-    adjustDuplicateColumns(warn = FALSE, add = TRUE) %>%
-    left_join(extraSoloSubtract, by = c("drug", "variant")) %>%  # NEW
-    adjustDuplicateColumns(warn = FALSE, add = TRUE) %>%          # NEW
+    mergeCountColumns() %>%
+    left_join(extraSoloSubtract, by = c("drug", "variant")) %>%
+    mergeCountColumns() %>%
     mutate(absent_R = RDen - present_R, absent_S = SDen - present_S) %>%
     mutate(SOLO_SorR = SOLO_R + SOLO_S) %>%  # NEW: recalculate
     select(-RDen, -SDen) %>%
@@ -445,9 +429,7 @@ getOrphanData = function(DATA_DIRECTORY, EXTRACTION_ID, minMAF = MAF_THRESHOLD_R
   orphanData = read_csv(list.files(orphanDir, full.names = TRUE)[1], guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
     rename(drug = drug_name, gene = resolved_symbol, mutation = variant_category, effect = predicted_effect) %>%
     mutate(variant = paste0(gene, "_", mutation), phenotype = "U") %>%
-    applyThresholds(minMAF = minMAF, lowMAFHet = TRUE, minQ = minQ, lowQHet = TRUE) %>%
-    extractPositions(colName = "mutation", maxNumber = 2L) %>%
-    computeRRDRInfo()
+    applyVariantPostprocessing(minMAF = minMAF, minQ = minQ)
   orphanData
 }
 
