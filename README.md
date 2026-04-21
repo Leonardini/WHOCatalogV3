@@ -6,7 +6,7 @@ An R package implementing the SOLO algorithm for analysing genomic variants and 
 
 ```r
 # install.packages("remotes")
-remotes::install_github("lchindel/SOLOport")
+remotes::install_github("Leonardini/WHOCatalogV3")
 ```
 
 ## Dependencies
