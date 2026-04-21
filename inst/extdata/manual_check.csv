@@ -1,0 +1,39 @@
+﻿drug,gene,variant,Supplementary_Grading_Considerations,Final_Confidence_Grading
+Cycloserine,cycA,cycA_p.Arg93Leu,Additional grading evidence: Literature evidence (PMID: 27064254; PMID: 28971867),4) Not assoc w R - Interim
+Ethambutol,embB,embB_p.Gly406Asp,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethambutol,embB,embB_p.Tyr319Cys,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethionamide,ethA,ethA_p.Cys403Tyr,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethionamide,ethA,ethA_p.Val202Gly,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethionamide,ethA,ethA_p.Thr88Ile,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethionamide,ethA,ethA_c.-7T>C,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Ethionamide,inhA,inhA_p.Ser94Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Isoniazid,inhA,inhA_p.Ser94Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Levofloxacin,gyrB,gyrB_p.Asn499Thr,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Levofloxacin,gyrB,gyrB_p.Ser447Phe,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Levofloxacin,gyrB,gyrB_p.Ala504Val,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Levofloxacin,gyrA,gyrA_p.Gly88Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Moxifloxacin,gyrB,gyrB_p.Ala504Val,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Moxifloxacin,gyrB,gyrB_p.Ser447Phe,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Moxifloxacin,gyrB,gyrB_p.Asn499Thr,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Moxifloxacin,gyrA,gyrA_p.Gly88Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Val139Leu,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Ala178_Ser179del,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp8Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Val155Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Thr61Pro,Additional grading evidence: WHO catalogue 2nd edition,3) Uncertain significance
+Pyrazinamide,pncA,pncA_p.Thr114Pro,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Phe106Leu,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Tyr103Asp,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Tyr95Asp,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Ser104Ile,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp136Val,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Val163Ala,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp8Tyr,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Met175Ile,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp126_Val130del,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Ala171Pro,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp129Asn,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Asp49Glu,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Cys14Trp,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Pyrazinamide,pncA,pncA_p.Pro54Thr,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim
+Streptomycin,rpsL,rpsL_p.Lys88Gln,Additional grading evidence: WHO catalogue 2nd edition,2) Assoc w R - Interim

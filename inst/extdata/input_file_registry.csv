@@ -1,0 +1,8 @@
+filename,description,last_updated,used_by
+literature_neutrals.csv,Literature-based neutral mutations,15/10/2025,Driver.R (mainDriver)
+manual_check.csv,Manual grading overrides applied to the final catalogue,26/02/2026,Driver.R (mainDriver)
+assay_mutations.csv,Mutations recognized as DR markers through WHO-endorsed assays,24/04/2023,Grading.R (loadGradingAuxData)
+allelic_exchanges.csv,Allelic exchange evidence supporting variant grading,24/02/2026,Grading.R (loadGradingAuxData)
+grading_comments.csv,Per-variant supplementary grading comments,25/02/2026,Grading.R (loadGradingAuxData)
+v2_grades.csv,Previous-version (v2) confidence grades for all variants,26/02/2026,Grading.R (loadGradingAuxData)
+who_catalogue_prev_version.xlsx,Previous WHO TB mutation catalogue (WHO-UCN-TB-2023.7),31/07/2023,NeutralAlgorithm.R (neutralAlgorithm) / SensSpec.R (runComputeSensSpec)

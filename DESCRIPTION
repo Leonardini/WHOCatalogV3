@@ -1,0 +1,26 @@
+Package: SOLOport
+Title: SOLO Algorithm for WHO Tuberculosis Drug Resistance Catalogue
+Version: 0.1.0
+Authors@R:
+    person("Leonid", "Chindelevitch", email = "lchindel@ic.ac.uk", role = c("aut", "cre"))
+Description: Implements the SOLO algorithm for analysing genomic variants and
+    their association with drug resistance phenotypes, used to produce the WHO
+    tuberculosis mutation catalogue.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    dplyr,
+    igraph,
+    magrittr,
+    purrr,
+    readr,
+    readxl,
+    stringr,
+    tibble,
+    tidyr
+Suggests:
+    devtools,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

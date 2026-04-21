@@ -1,0 +1,41 @@
+﻿Drug ,Gene ,Variant ,Comment 
+Isoniazid ,katG ,any AwR ,High-level resistance 
+Isoniazid ,katG ,any AwRI ,High-level resistance 
+Isoniazid ,inhA ,any AwR ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Isoniazid ,inhA ,any AwRI ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Isoniazid,ahpC,c.-76T>A,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-52C>T,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-72C>T,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-81C>T,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-51G>A,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-57C>T,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-52C>A,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-54C>T,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-77T>A,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,ahpC,c.-48G>A,Compensatory mutation. If genetically linked with a coding katG Group 3 mutation upgrade to Group 2 and report high level resistance
+Isoniazid,katG,any Uncertan,If genetically linked with an ahpC compensatory mutation upgrade to Group 2 and report high-level resistance
+Moxifloxacin ,gyrA ,p.Ala90Val ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrA ,p.Asp89Asn ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrA ,p.Asp94Ala ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrA ,p.Asp94Asn ,High-level resistance 
+Moxifloxacin ,gyrA ,p.Asp94Gly ,High-level resistance 
+Moxifloxacin ,gyrA ,p.Asp94His ,High-level resistance 
+Moxifloxacin ,gyrA ,p.Asp94Tyr ,High-level resistance 
+Moxifloxacin ,gyrA ,p.Gly88Ala ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrA ,p.Gly88Cys ,High-level resistance 
+Moxifloxacin ,gyrA ,p.Ser91Pro ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrB ,any AwR ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Moxifloxacin ,gyrB ,any AwRI ,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance) "
+Amikacin ,eis ,c.-14C>T ,Can only confer resistance if genetically linked to a functional Eis 
+Kanamycin ,eis ,c.-14C>T ,Can only confer resistance if genetically linked to a functional Eis 
+Kanamycin ,eis ,c.-10G>A ,Can only confer resistance if genetically linked to a functional Eis 
+Amikacin ,eis ,any LoF ,Abrogates effect of genetically linked AwR and AwRI eis mutations 
+Kanamycin ,eis ,any LoF ,Abrogates effect of genetically linked AwR and AwRI eis mutations 
+Bedaquiline ,Rv0678 ,any AwR ,Can only confer resistance if genetically linked to a functional MmpL5 
+Bedaquiline ,Rv0678 ,any AwRI ,Can only confer resistance if genetically linked to a functional MmpL5 
+Bedaquiline ,mmpL5 ,LoF ,Abrogates effect of genetically linked AwR and AwRI Rv0678 mutations 
+Clofazimine ,Rv0678 ,any AwR ,Can only confer resistance if genetically linked to a functional MmpL5 
+Clofazimine ,Rv0678 ,any AwRI ,Can only confer resistance if genetically linked to a functional MmpL5 
+Clofazimine ,mmpL5 ,LoF ,Abrogates effect of genetically linked AwR and AwRI Rv0678 mutations 
+Pyrazinamide,pncA,c.138A>G,"Consider that this variant might indicate that the isolate is M. canettii, which is intrinsically pyrazinamide-resistant and pretomanid-resistant due to unknown mechanisms"
+Cycloserine,cycA,p.Gly122Ser,"Consider that this variant might indicate that the isolate is M. bovis BCG, which is intrinsically cycloserine-resistant due to cycA_p.Gly122Ser and pyrazinamide-resistant due to pncA_p.His57Asp"
