@@ -58,7 +58,9 @@ neutralAlgorithm = function(masterTab, litTab,
   for (set in c("D", "E")) {
     ## filter out silent, tier 2 variants, and those in previous sets (C, D?), plus isolates containing a het
     subsetTab = masterTab %>%
-      dplyr::filter(!(effect %in% SILENT_EFFECTS | tier == 2 | setC))
+      dplyr::filter(!effect %in% SILENT_EFFECTS) %>%
+      dplyr::filter(tier != 2) %>%
+      dplyr::filter(!setC)
     if (set == "E") {
       subsetTab = subsetTab %>%
         dplyr::filter(!setD)

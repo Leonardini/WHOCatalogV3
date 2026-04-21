@@ -32,6 +32,87 @@ summarizeEpiGroup = function(df, groupByCols, extraCols) {
     summarise(N = n(), .groups = "drop")
 }
 
+#' Compute epistasis groupings and PPV tables for AMI, KAN, and BDQ
+#' @noRd
+computeEpistasisStats = function(fullDataset) {
+  fullDataset %<>%
+    mutate(excludeEpi_Candidate = FALSE, excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE) %>%
+    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
+    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
+    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
+    mutate_at("excludeEpi_Regular"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
+                                        ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
+                                        ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))}) %>%
+    mutate_at("excludeEpi_Relaxed"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
+                                        ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
+                                        ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))})
+  fullDataset %<>% ungroup()
+  epiTabs = vector("list", 4) %>%
+    magrittr::set_names(c("AMI", "KAN", paste0("BDQ_", STRATIFY_BDQ_GENES)))
+  for (drugName in c("AMI", "KAN")) {
+    curEpiTab = fullDataset %>%
+      dplyr::filter(drug_short == drugName) %>%
+      group_by(sample_id) %>%
+      dplyr::filter(!any(variant %in% EXCLUDE_SET[["BOTH"]]) & !(drug_short == "KAN" & sum(variant %in% EXCLUDE_SET[["KAN_EXT"]]) > 1)) %>%
+      dplyr::filter(any(variant %in% EXCLUDE_SET[[paste0(drugName, "_EXT")]] & !het_strict)) %>%
+      assignEpiGroup("eis") %>%
+      dplyr::filter(variant %in% EXCLUDE_SET[[paste0(drugName, "_EXT")]] & !het_strict) %>%
+      ungroup() %>%
+      summarizeEpiGroup(c("Group", "variant", "phenotype"), "drug")
+    epiTabs[[drugName]] = curEpiTab
+  }
+  curEpiTab = fullDataset %>%
+    dplyr::filter(drug_short == "BDQ") %>%
+    group_by(sample_id) %>%
+    dplyr::filter(!any(gene %in% EXCLUDE_BDQ_GENES & Final <= 2)) %>%
+    dplyr::filter(any(gene %in% BDQ_GENE & Final <= 2 & !het_strict))
+  for (geneName in STRATIFY_BDQ_GENES) {
+    subEpiTab = curEpiTab %>%
+      assignEpiGroup(geneName) %>%
+      dplyr::filter(gene %in% BDQ_GENE & Final <= 2 & !het_strict) %>%
+      slice(1) %>%
+      ungroup() %>%
+      summarizeEpiGroup(c("Group", "phenotype"), c("gene", "drug"))
+    epiTabs[[paste0("BDQ_", geneName)]] = subEpiTab
+  }
+  fullDataset %<>% group_by(sample_id, drug)
+  list(fullDataset = fullDataset, epiTabs = epiTabs)
+}
+
+#' Compute compensatory mutation tables for INH
+#' @noRd
+computeCompensatoryStats = function(fullDataset) {
+  fullDataset %<>% ungroup()
+  compTabs = vector("list", 2) %>%
+    magrittr::set_names(c("INH", "RIF"))
+  miniTab1 = fullDataset %>%
+    dplyr::filter(drug_short == "INH") %>%
+    dplyr::filter(!(gene %in% c("ahpC", "katG") & Final >= 4)) %>%
+    group_by(sample_id) %>%
+    dplyr::filter(!any(is.na(phenotype))) %>%
+    dplyr::filter(!any(gene == "ahpC" & effect %in% POOLED_EFFECTS[["LoF"]])) %>%
+    ungroup() %>%
+    mutate(MOI = (gene == "ahpC" & (!is.na(as.integer(position))) & as.integer(position) >= 2726101 & as.integer(position) <= 2726192)) %>%
+    group_by(sample_id) %>%
+    mutate(num_MOI = sum(MOI, na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(relevant_MOI = ifelse(MOI & num_MOI == 1 & !het_strict, mutation, NA)) %>%
+    group_by(sample_id) %>%
+    dplyr::filter(any(!is.na(relevant_MOI))) %>%
+    mutate(relevant_MOI = na.omit(unique(relevant_MOI)))
+  allTabs = vector("list", 6) %>%
+    magrittr::set_names(LETTERS[1:6])
+  allTabs[["A"]] = miniTab1
+  allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= 2))
+  allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr"))))
+  allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= 2 | effect %in% POOLED_EFFECTS[["LoF"]])))
+  allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant")))
+  allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS)))
+  compTabs[["INH"]] = allTabs
+  fullDataset %<>% group_by(sample_id, drug)
+  list(fullDataset = fullDataset, compTabs = compTabs)
+}
+
 #' Compute sensitivity and specificity statistics for a catalogue against a dataset
 #' @param fullDataset A data frame of genotype-phenotype data as produced by loadSensSpecData.
 #' @param safe Logical; if TRUE, applies the neutral algorithm from scratch before computing sens/spec.
@@ -53,15 +134,11 @@ computeSensSpec = function(fullDataset,
                            relaxed = FALSE,
                            skipCompensatory = TRUE,
                            saveIntermed = FALSE) {
-  processedDatasets = vector("list", 3) %>%
-    magrittr::set_names(c("strict", "regular", "relaxed"))
-  minMAFs = c(MAF_THRESHOLD_STRICT, MAF_THRESHOLD_REGULAR, MAF_THRESHOLD_RELAXED)
-  for (ind in 1:length(minMAFs)) {
-    curName = names(processedDatasets)[ind]
+  processedDatasets = imap(MAF_THRESHOLDS, function(threshold, curName) {
     print(paste("Processing option", curName))
-    processedDatasets[[ind]] = fullDataset %>%
-      applyCatalogue(catalogueFile, minMAF = minMAFs[ind], minQ = QUALITY_THRESHOLD_STRICT, LoF = TRUE, version = version)
-  }
+    fullDataset %>%
+      applyCatalogue(catalogueFile, minMAF = threshold, minQ = QUALITY_THRESHOLD_STRICT, LoF = TRUE, version = version)
+  })
   fullDataset = processedDatasets[["regular"]] %>%
     mutate(het_relaxed = processedDatasets[["relaxed"]]$het) %>%
     mutate(het_strict  = processedDatasets[["strict" ]]$het)
@@ -91,87 +168,17 @@ computeSensSpec = function(fullDataset,
     select(-pos1, -pos2, -LoF_candidate)
   fullDataset %<>%
     group_by(sample_id, drug)
-  ## Implement the epistasis rules for AMI, KAN and BDQ in version 2 only (BDQ/CFZ restricted to mmpL5)
   ## TODO: I still need to implement the epistasis rules for AMI, KAN and BDQ/CFZ in version 3!
   if (version == CURR_VERSION) {
-    fullDataset %<>%
-      mutate(excludeEpi_Candidate = FALSE, excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE) %>%
-      mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-      mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-      mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-      mutate_at("excludeEpi_Regular"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
-                                          ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,      
-                                          ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))}) %>%
-      mutate_at("excludeEpi_Relaxed"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
-                                          ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,          
-                                          ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))})
     if (!skipEpistasis) {
-      fullDataset %<>%
-        ungroup()
-      ## Compute the epistasis-specific PPV for AMI and KAN
-      epiTabs = vector("list", 4) %>%
-        magrittr::set_names(c("AMI", "KAN", paste0("BDQ_", STRATIFY_BDQ_GENES)))
-      for (drugName in c("AMI", "KAN")) {
-        curEpiTab = fullDataset %>%
-          dplyr::filter(drug_short == drugName) %>%
-          group_by(sample_id) %>%
-          dplyr::filter(!any(variant %in% EXCLUDE_SET[["BOTH"]]) & !(drug_short == "KAN" & sum(variant %in% EXCLUDE_SET[["KAN_EXT"]]) > 1)) %>%
-          dplyr::filter(any(variant %in% EXCLUDE_SET[[paste0(drugName, "_EXT")]] & !het_strict)) %>%
-          assignEpiGroup("eis") %>%
-          dplyr::filter(variant %in% EXCLUDE_SET[[paste0(drugName, "_EXT")]] & !het_strict) %>%
-          ungroup() %>%
-          summarizeEpiGroup(c("Group", "variant", "phenotype"), "drug")
-        epiTabs[[drugName]] = curEpiTab
-      }
-      ## Compute the epistasis-specific PPV for BDQ
-      curEpiTab = fullDataset %>%
-        dplyr::filter(drug_short == "BDQ") %>%
-        group_by(sample_id) %>%
-        dplyr::filter(!any(gene %in% EXCLUDE_BDQ_GENES & Final <= 2)) %>%
-        dplyr::filter(any(gene %in% BDQ_GENE & Final <= 2 & !het_strict))
-      for (geneName in STRATIFY_BDQ_GENES) {
-        subEpiTab = curEpiTab %>%
-          assignEpiGroup(geneName) %>%
-          dplyr::filter(gene %in% BDQ_GENE & Final <= 2 & !het_strict) %>%
-          slice(1) %>%
-          ungroup() %>%
-          summarizeEpiGroup(c("Group", "phenotype"), c("gene", "drug"))
-        epiTabs[[paste0("BDQ_", geneName)]] = subEpiTab
-      }
-      fullDataset %<>%
-        group_by(sample_id, drug)
+      result      = computeEpistasisStats(fullDataset)
+      fullDataset = result$fullDataset
+      epiTabs     = result$epiTabs
     }
     if (!skipCompensatory) {
-      fullDataset %<>%
-        ungroup()
-      compTabs = vector("list", 2) %>%
-        magrittr::set_names(c("INH", "RIF"))
-      miniTab1 = fullDataset %>%
-        dplyr::filter(drug_short == "INH") %>%
-        dplyr::filter(!(gene %in% c("ahpC", "katG") & Final >= 4)) %>%
-        group_by(sample_id) %>%
-        dplyr::filter(!any(is.na(phenotype))) %>%
-        dplyr::filter(!any(gene == "ahpC" & effect %in% POOLED_EFFECTS[["LoF"]])) %>%
-        ungroup() %>%
-        mutate(MOI = (gene == "ahpC" & (!is.na(as.integer(position))) & as.integer(position) >= 2726101 & as.integer(position) <= 2726192)) %>%
-        group_by(sample_id) %>%
-        mutate(num_MOI = sum(MOI, na.rm = TRUE)) %>%
-        ungroup() %>%
-        mutate(relevant_MOI = ifelse(MOI & num_MOI == 1 & !het_strict, mutation, NA)) %>%
-        group_by(sample_id) %>%
-        dplyr::filter(any(!is.na(relevant_MOI))) %>%
-        mutate(relevant_MOI = na.omit(unique(relevant_MOI)))
-      allTabs = vector("list", 6) %>%
-        magrittr::set_names(LETTERS[1:6])
-      allTabs[["A"]] = miniTab1
-      allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= 2))
-      allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr"))))
-      allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= 2 | effect %in% POOLED_EFFECTS[["LoF"]])))
-      allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant")))
-      allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS)))
-      compTabs[["INH"]] = allTabs
-      fullDataset %<>%
-        group_by(sample_id, drug)
+      result      = computeCompensatoryStats(fullDataset)
+      fullDataset = result$fullDataset
+      compTabs    = result$compTabs
     }
   }
   ## Assign the final "regular" and "relaxed" groups to each sample; NB: samples flagged for epistasis will be counted as not fitting the catalogue criteria
