@@ -3,6 +3,10 @@
 #' @param catalogueFile Path to a catalogue file (.csv or .xlsx).
 #' @param version Catalogue version to apply; controls DLM/PMD cross-resistance handling.
 #' @inheritParams mainDriver
+#' @return \code{inputData} with additional columns: \code{het} (logical, TRUE if the variant fails
+#'   MAF or quality thresholds), \code{RRDR_NON_SILENT} (logical), \code{LoF_candidate} (logical,
+#'   TRUE for novel LoF mutations in genes that have a graded pooled LoF), and \code{Final} (integer
+#'   catalogue grade, NA if the variant is absent from the catalogue).
 #' @export
 applyCatalogue = function(inputData, catalogueFile, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet = TRUE, 
                           minQ = QUALITY_THRESHOLD_STRICT, lowQHet = TRUE,

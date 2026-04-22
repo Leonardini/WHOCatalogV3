@@ -106,6 +106,10 @@ originalSOLO = function(inputTab, maxIter = MAX_ITER, removeSOnly = TRUE, listIs
 #' @param stage Integer stage label appended to the output; NULL omits it.
 #' @param removeSOnly Logical; if TRUE, variants occurring only in susceptible isolates are classified and removed before the main loop.
 #' @inheritParams mainDriver
+#' @return A named list. Element \code{classes} is a tibble with one row per variant-drug pair
+#'   containing columns \code{drug}, \code{variant}, \code{class} (S/U/R), \code{Rcnt}, \code{Scnt},
+#'   and optionally \code{stage}. If \code{listIsolates = TRUE}, a second element \code{isolates}
+#'   is included with columns \code{drug}, \code{variant}, \code{sample_id}, and optionally \code{stage}.
 #' @export
 runSOLOPipeline = function(inputTab, maxIter, stage = NULL, removeSOnly = TRUE, listIsolates = FALSE) {
   stopifnot(ncol(inputTab) %in% 4:5 && all(colnames(inputTab)[1:4] == c("drug", "sample_id", "variant", "phenotype")))

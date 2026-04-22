@@ -83,6 +83,9 @@ loadGradingAuxData = function(dir) {
 #' @param stage Integer stage index (1, 2, or 3); NA runs all stages together.
 #' @param outDir Directory for reading intermediate stat files and writing grading output.
 #' @inheritParams mainDriver
+#' @return A data frame of graded variants with one row per variant-drug pair, including columns
+#'   \code{variant}, \code{drug}, \code{Initial} and \code{Final} (grade labels from \code{GRADES}),
+#'   \code{Additional grading criteria}, and rule-tracking columns. Also writes a dated CSV to \code{outDir}.
 #' @export
 gradeMutations = function(LoF = TRUE, NON_DATABASE_DIRECTORY = system.file("extdata", package = "SOLOport"), stage = NA, outDir = ".") {
   inputTab = prepareGradingInput(stage = stage, LoF = LoF, outDir = outDir)

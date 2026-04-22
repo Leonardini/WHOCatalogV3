@@ -123,6 +123,11 @@ computeCompensatoryStats = function(fullDataset) {
 #' @param skipCompensatory Logical; if TRUE, skips the compensatory mutation analysis.
 #' @param saveIntermed Logical; if TRUE, writes intermediate result tables to disk.
 #' @inheritParams applyCatalogue
+#' @return A named list with element \code{fullTab}, a tibble of sensitivity/specificity statistics
+#'   per drug and classification group with columns \code{group}, \code{drug}, \code{TP}, \code{TN},
+#'   \code{FP}, \code{FN}, and binomial CI columns for \code{PPV}, \code{NPV}, \code{Sens},
+#'   \code{Spec}, and \code{propR}. If \code{skipEpistasis = FALSE}, also contains \code{epiTab};
+#'   if \code{skipCompensatory = FALSE}, also contains \code{compTab}.
 #' @export
 computeSensSpec = function(fullDataset,
                            catalogueFile,

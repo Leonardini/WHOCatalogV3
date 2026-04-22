@@ -350,12 +350,16 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
 #' @param lowMAFHet Logical; if TRUE, low-MAF variants become hets; if FALSE, they are filtered out.
 #' @param minQ Minimum quality score; variants below this threshold are treated as heterozygous.
 #' @param lowQHet Logical; if TRUE, low-quality variants become hets; if FALSE, they are filtered out.
-#' @param EXTRACTION_ID Identifier string for the database extraction (used to locate input files); defaults to the package constant EXTRACTION_ID.
+#' @param EXTRACTION_ID Identifier string for the database extraction; used to construct paths to
+#'   genotype, phenotype, orphan, and lineage directories. Defaults to the package-level constant of the same name.
 #' @param listIsolates Logical; if TRUE, records all isolates classified as solo at each iteration.
 #' @param augmentWithOrphansAndLineage Logical; if TRUE, add a breakdown by sub-lineage and the number of orphans.
 #' @param OUTPUT_DIRECTORY Directory for writing output files; defaults to Results/<EXTRACTION_ID>.
 #' @param DATA_DIRECTORY Directory containing the database extraction files.
 #' @param NON_DATABASE_DIRECTORY Directory containing non-database reference files (defaults to inst/extdata).
+#' @return A named list of annotated data frames keyed by phenotype group and pooling mode
+#'   (e.g. \code{"MAIN"}, \code{"WHO"}, \code{"MAIN_unpooled"}, \code{"MAIN_LoF"}). The primary
+#'   outputs are the graded catalogue CSV files written to \code{OUTPUT_DIRECTORY}.
 #' @export
 mainDriver = function(correct_all = TRUE,
                       LoF = TRUE,
