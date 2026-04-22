@@ -206,7 +206,7 @@ computeSensSpec = function(fullDataset,
     ungroup()
   ## Calculate the size of groups 1, 2, 3, 1 + 2, and 1 + 2 + 3, with both regular and relaxed thresholds and each RIF_geno status, for each drug
   finalTabs = vector("list", 3 * 2 * 5 * 8) %>%
-    magrittr::set_names(outer(paste0("Lineage", c(1:6, LINEAGE_OTHER, LINEAGE_ANY)), outer(c("R", "S", "ALL"), outer(c("Regular", "Relaxed"), STAGES,
+    magrittr::set_names(outer(paste0("Lineage", c(1:LINEAGE_MAX, LINEAGE_OTHER, LINEAGE_ANY)), outer(c("R", "S", "ALL"), outer(c("Regular", "Relaxed"), STAGES,
                     function(x, y) {paste0(x, "_", y)}), function(z, w) {paste0("RIF", z, "_", w)}), function(a, b) {paste0(a, "_", b)}))
   for (relax in c(FALSE, TRUE)) {
     if (relax) {
@@ -223,7 +223,7 @@ computeSensSpec = function(fullDataset,
       } else {
         curSubset = curDataset
       }
-      for (Lineage in c(LINEAGE_ANY, as.character(1:6), LINEAGE_OTHER)) {
+      for (Lineage in c(LINEAGE_ANY, as.character(1:LINEAGE_MAX), LINEAGE_OTHER)) {
         if (Lineage == LINEAGE_ANY) {
           curSuperTab = curSubset
         } else {
