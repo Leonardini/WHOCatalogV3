@@ -34,8 +34,8 @@ applyNamedRule = function(inputTab, name, description = NULL, finalRule = NULL) 
 #' Prepare the master variant table, carry out basic sanity checks, and compute genes and mutations
 #' @noRd
 prepareGradingInput = function(stage = NA, LoF = TRUE, outDir = ".") {
-  Tab0 = read_csv(file.path(outDir, paste0("Stats_WHO" , ifelse(LoF, "_withLoFs", ""), "_Stage", stage, ".csv")), guess_max = LARGE_NUMBER, show_col_types = FALSE)
-  Tab1 = read_csv(file.path(outDir, paste0("Stats_MAIN", ifelse(LoF, "_withLoFs", ""), "_Stage", stage, ".csv")), guess_max = LARGE_NUMBER, show_col_types = FALSE)
+  Tab0 = read_csv(file.path(outDir, paste0(STATS_FILE_PREFIX, "WHO" , ifelse(LoF, WITHLOFS_SUFFIX, ""), "_Stage", stage, ".csv")), guess_max = LARGE_NUMBER, show_col_types = FALSE)
+  Tab1 = read_csv(file.path(outDir, paste0(STATS_FILE_PREFIX, "MAIN", ifelse(LoF, WITHLOFS_SUFFIX, ""), "_Stage", stage, ".csv")), guess_max = LARGE_NUMBER, show_col_types = FALSE)
   stopifnot(all(Tab0$datasets == "WHO"))
   stopifnot(all(Tab1$datasets == "ALL"))
   stopifnot(nrow(Tab0 %>% anti_join(Tab1, by = c("variant", "drug"))) == 0)
@@ -52,7 +52,7 @@ loadGradingAuxData = function(dir) {
     mutate(drug = DRUG_LIST[match(drug, SHORT_NAMES)]) %>%
     mutate(assay = TRUE)
   allelicTab = read_csv(paste0(dir, "/allelic_exchanges.csv"), show_col_types = FALSE, guess_max = LARGE_NUMBER) %>%
-    mutate(variant = str_replace(variant, "lof$", "LoF")) %>%
+    mutate(variant = str_replace(variant, "lof$", LOF_LABEL)) %>%
     mutate(allelic = TRUE)
   extraTab = read_csv(paste0(dir, "/v", PREV_VERSION, "_grades.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
     mutate(Final_prev_version = match(final_grading_prev_version, GRADES))
@@ -106,14 +106,14 @@ applyGradingRules = function(inputTab, auxData) {
   inputTab = inputTab %>%
     mutate(Initial            = ifelse(!is.na(neutral) & neutral, 5, 3)) %>% ## ADDED "& neutral" to the line below - October 10,2024
     mutate(Rule_Initial       = ifelse(!is.na(neutral) & neutral, ifelse(datasets == "WHO", 1, 6), ifelse(datasets == "WHO", 5, 9))) %>%
-    mutate(rule_initial_up    = (SOLO_SorR >= 5        & !is.na(PPVc_SOLO_lb) & PPVc_SOLO_lb >= 0.25 & OR_SOLO > 1        & OR_SOLO_pval_FDR_sig)) %>%
+    mutate(rule_initial_up    = (SOLO_SorR >= MIN_SOLO_COUNT_UPGRADE & !is.na(PPVc_SOLO_lb) & PPVc_SOLO_lb >= 0.25 & OR_SOLO > 1        & OR_SOLO_pval_FDR_sig)) %>%
     mutate(Initial      = ifelse(rule_initial_up, 1, Initial)) %>%
     mutate(Rule_Initial = ifelse(rule_initial_up, ifelse(datasets == "WHO", 2, 7), Rule_Initial)) %>%
     mutate(rule_pncA_down     = (gene == PZA_GENE  & !is.na(PPV_SOLO)     & PPV_SOLO < 0.4       & PPV_SOLO_ub < 0.75 & datasets == "WHO" & stage == 1)) %>%
     mutate(Rule_Initial = ifelse(rule_pncA_down, 3, Rule_Initial)) %>%
-    mutate(rule_pncA_up       = (gene == PZA_GENE  & SOLO_R >= 2          & PPVc_SOLO >= 0.5 & stage == 1)) %>% ## Used to be PPV
-    ## NOTE: mutation != "LoF" was intentionally removed from the rule below
-    mutate(rule_newGenes_up   = (paste(drug, gene, sep = "_") %in% paste(NEW_PAIRS$drug, NEW_PAIRS$gene, sep = "_") & SOLO_R >= 2 & PPVc_SOLO >= 0.5 & stage == 1)) %>%
+    mutate(rule_pncA_up       = (gene == PZA_GENE  & SOLO_R >= 2          & PPVc_SOLO >= PPVC_UPGRADE_THRESHOLD & stage == 1)) %>% ## Used to be PPV
+    ## NOTE: mutation != LOF_LABEL was intentionally removed from the rule below
+    mutate(rule_newGenes_up   = (paste(drug, gene, sep = "_") %in% paste(NEW_PAIRS$drug, NEW_PAIRS$gene, sep = "_") & SOLO_R >= 2 & PPVc_SOLO >= PPVC_UPGRADE_THRESHOLD & stage == 1)) %>%
     mutate(Initial      = ifelse(rule_pncA_down & Initial == 3, 4, ifelse((rule_pncA_up | rule_newGenes_up) & Initial == 3, 2, Initial))) %>%
     mutate(Rule_Initial = ifelse(rule_pncA_up | rule_newGenes_up, ifelse(datasets == "WHO", 4, 8), Rule_Initial)) 
   ## Reconcile initial confidence grading between the WHO and the ALL datasets by first separating them once again
@@ -174,9 +174,9 @@ applyGradingRules = function(inputTab, auxData) {
   ## If a pooled LoF is graded 1 or 2, then any grade 3 LoF mutation in the same drug-gene combination is upgraded to grade 2
   inputTab = inputTab %>%
     group_by(gene, drug) %>%
-    mutate(rule_LoF_candidate = (any(mutation == "LoF" & Final <= 2))) %>%
+    mutate(rule_LoF_candidate = (any(mutation == LOF_LABEL & Final <= RESISTANCE_GRADE_MAX))) %>%
     ungroup() %>%
-    mutate(rule_LoF = (rule_LoF_candidate & mutation != "LoF" & effect_ALL %in% POOLED_EFFECTS[["LoF"]]                     & Initial == 3)) %>%
+    mutate(rule_LoF = (rule_LoF_candidate & mutation != LOF_LABEL & effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]]                     & Initial == 3)) %>%
     applyNamedRule("rule_LoF")
   initRuleCrossRes = ruleEndNum("cross_res") - NUM_CROSS_RES_RULES + 1L
   ## Apply the cross-resistance rules the first time around
@@ -199,9 +199,9 @@ applyGradingRules = function(inputTab, auxData) {
   ## If any of the rules after the cross-resistance one has upgraded a pooled LOF variant to grade 2, we apply it one more time to the corresponding variants
   inputTab = inputTab %>%
     group_by(gene, drug) %>%
-    mutate(rule_LoF_re_candidate = any(mutation == "LoF" & Final <= 2 & Rule_Final >= initRuleCrossRes)) %>%
+    mutate(rule_LoF_re_candidate = any(mutation == LOF_LABEL & Final <= RESISTANCE_GRADE_MAX & Rule_Final >= initRuleCrossRes)) %>%
     ungroup() %>%
-    mutate(rule_LoF_re = (rule_LoF_re_candidate & mutation != "LoF" & effect_ALL %in% POOLED_EFFECTS[["LoF"]]              & Initial == 3)) %>%
+    mutate(rule_LoF_re = (rule_LoF_re_candidate & mutation != LOF_LABEL & effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]]              & Initial == 3)) %>%
     applyNamedRule("rule_LoF_re")
   ## Apply the cross-resistance rules the second time around
   inputTab = inputTab %>%
@@ -231,7 +231,7 @@ applyGradingRules = function(inputTab, auxData) {
   commentSingleTab   = auxData$commentSingleTab
   inputTab = inputTab %>%
     full_join(commentLoF,         by = c("drug", "gene")) %>%
-    mutate(comment = ifelse(!(effect_ALL %in% POOLED_EFFECTS[["LoF"]]), NA, comment)) %>%
+    mutate(comment = ifelse(!(effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]]), NA, comment)) %>%
     full_join(commentCategoryTab, by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
     adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
     full_join(commentSingleTab  , by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
@@ -250,7 +250,7 @@ applyGradingRules = function(inputTab, auxData) {
     mutate(temp = paste("from",   GRADES[Final_prev_version], "to", GRADES[Final])) %>%
     mutate(OverallFlag = ifelse(is.na(Final_prev_version), paste("New", GRADES[Final]),
                                 ifelse(Final_prev_version == Final, "No change",
-                                       ifelse((Final_prev_version < 3 & Final > 3) | (Final_prev_version > 3 & Final < 3), paste("Switch", temp), 
+                                       ifelse((Final_prev_version <= RESISTANCE_GRADE_MAX & Final > 3) | (Final_prev_version > 3 & Final <= RESISTANCE_GRADE_MAX), paste("Switch", temp),
                                          ifelse(abs(Final_prev_version - 3) < abs(Final - 3), paste("Up", temp), paste("Down", temp)))))) %>%
     select(-temp)
   ## Lastly, convert the numerical grades to their description and save the file
@@ -264,8 +264,8 @@ applyGradingRules = function(inputTab, auxData) {
 #' Write graded variant results to a CSV file
 #' @noRd
 writeGradingOutput = function(inputTab, stage, LoF = TRUE, outDir = ".") {
-  outFilename = paste("Final_graded_algorithm_catalogue", Sys.Date(), sep = "_")
-  outFilename = paste0(outFilename, ifelse(LoF, "_withLoFs", ""), "_Stage", stage, ".csv")
+  outFilename = paste(GRADED_CATALOGUE_PREFIX, Sys.Date(), sep = "_")
+  outFilename = paste0(outFilename, ifelse(LoF, WITHLOFS_SUFFIX, ""), "_Stage", stage, ".csv")
   write_csv(inputTab, file = file.path(outDir, outFilename))
 }
 
@@ -289,7 +289,7 @@ applyCrossResistanceRules = function(inputTab, iteration = 1, initRule = 0) {
     curDrugs = c(curSetting$drug1, curSetting$drug2)
     extra_variants = inputTab %>%
       group_by(variant) %>%
-      mutate(add_variant = (any(sum(drug %in% curDrugs) == 1 & gene %in% curSetting$genes[[1]] & Final < 3 & !(effect_ALL %in% POOLED_EFFECTS[["LoF"]])))) %>%
+      mutate(add_variant = (any(sum(drug %in% curDrugs) == 1 & gene %in% curSetting$genes[[1]] & Final <= RESISTANCE_GRADE_MAX & !(effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]])))) %>%
       ungroup() %>%
       dplyr::filter(add_variant & drug %in% curDrugs) %>%
       mutate(drug = curDrugs[3 - match(drug, curDrugs)], Initial = 3, `Additional grading criteria` = NA_character_) %>%
@@ -299,7 +299,7 @@ applyCrossResistanceRules = function(inputTab, iteration = 1, initRule = 0) {
     inputTab = inputTab %>%
       bind_rows(extra_variants) %>%
       group_by(variant) %>%
-      mutate(rule_cross_res = (gene %in% curSetting$genes[[1]] & any(drug %in% curDrugs & Final < 3) & drug %in% curDrugs & Initial == 3)) %>%
+      mutate(rule_cross_res = (gene %in% curSetting$genes[[1]] & any(drug %in% curDrugs & Final <= RESISTANCE_GRADE_MAX) & drug %in% curDrugs & Initial == 3)) %>%
       applyExpertRule("rule_cross_res", description = curSetting$description, finalGrade = 2, finalRule = initRule + (iteration - 1)/2) %>%
       ungroup()
     initRule = initRule + 1

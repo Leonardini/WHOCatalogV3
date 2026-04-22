@@ -1,7 +1,7 @@
 #' Load and prepare the complete dataset for sensitivity/specificity analysis
 #' @noRd
 loadSensSpecData = function(DATA_DIRECTORY, version, useOrphanData = TRUE, useLineageData = TRUE, useSublineageData = FALSE) {
-  fullDataset = read_csv(paste0("Results/", EXTRACTION_ID, "/CompleteDataset.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE)
+  fullDataset = read_csv(file.path("Results", EXTRACTION_ID, COMPLETE_DATASET_FILENAME), guess_max = LARGE_NUMBER, show_col_types = FALSE)
   if (useOrphanData) {
     orphanData = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID)
     fullDataset %<>%
@@ -19,7 +19,7 @@ loadSensSpecData = function(DATA_DIRECTORY, version, useOrphanData = TRUE, useLi
 #' @noRd
 assignEpiGroup = function(df, geneName) {
   df %>%
-    mutate(Group = ifelse( any(gene == geneName &  effect %in% POOLED_EFFECTS[["LoF"]] & !het_strict),                      "A",
+    mutate(Group = ifelse( any(gene == geneName &  effect %in% POOLED_EFFECTS[[LOF_LABEL]] & !het_strict),                      "A",
                            ifelse(!any(gene == geneName & !(effect %in% c(SILENT_EFFECTS, UPSTREAM_VAR)) & Final %in% 1:3), "B", NA)))
 }
 
@@ -37,15 +37,15 @@ summarizeEpiGroup = function(df, groupByCols, extraCols) {
 computeEpistasisStats = function(fullDataset) {
   fullDataset %<>%
     mutate(excludeEpi_Candidate = FALSE, excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
     mutate(excludeEpi_Regular   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
                                   ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= 2, TRUE, excludeEpi_Regular)))) %>%
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX, TRUE, excludeEpi_Regular)))) %>%
     mutate(excludeEpi_Relaxed   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
                                   ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= 2, TRUE, excludeEpi_Relaxed))))
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX, TRUE, excludeEpi_Relaxed))))
   fullDataset %<>% ungroup()
   epiTabs = vector("list", 4) %>%
     magrittr::set_names(c("AMI", "KAN", paste0("BDQ_", STRATIFY_BDQ_GENES)))
@@ -64,12 +64,12 @@ computeEpistasisStats = function(fullDataset) {
   curEpiTab = fullDataset %>%
     dplyr::filter(drug_short == "BDQ") %>%
     group_by(sample_id) %>%
-    dplyr::filter(!any(gene %in% EXCLUDE_BDQ_GENES & Final <= 2)) %>%
-    dplyr::filter(any(gene %in% BDQ_GENE & Final <= 2 & !het_strict))
+    dplyr::filter(!any(gene %in% EXCLUDE_BDQ_GENES & Final <= RESISTANCE_GRADE_MAX)) %>%
+    dplyr::filter(any(gene %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX & !het_strict))
   for (geneName in STRATIFY_BDQ_GENES) {
     subEpiTab = curEpiTab %>%
       assignEpiGroup(geneName) %>%
-      dplyr::filter(gene %in% BDQ_GENE & Final <= 2 & !het_strict) %>%
+      dplyr::filter(gene %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX & !het_strict) %>%
       slice(1) %>%
       ungroup() %>%
       summarizeEpiGroup(c("Group", "phenotype"), c("gene", "drug"))
@@ -90,7 +90,7 @@ computeCompensatoryStats = function(fullDataset) {
     dplyr::filter(!(gene %in% c("ahpC", "katG") & Final >= 4)) %>%
     group_by(sample_id) %>%
     dplyr::filter(!any(is.na(phenotype))) %>%
-    dplyr::filter(!any(gene == "ahpC" & effect %in% POOLED_EFFECTS[["LoF"]])) %>%
+    dplyr::filter(!any(gene == "ahpC" & effect %in% POOLED_EFFECTS[[LOF_LABEL]])) %>%
     ungroup() %>%
     mutate(MOI = (gene == "ahpC" & (!is.na(as.integer(position))) & as.integer(position) >= 2726101 & as.integer(position) <= 2726192)) %>%
     group_by(sample_id) %>%
@@ -103,9 +103,9 @@ computeCompensatoryStats = function(fullDataset) {
   allTabs = vector("list", 6) %>%
     magrittr::set_names(LETTERS[1:6])
   allTabs[["A"]] = miniTab1
-  allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= 2))
+  allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= RESISTANCE_GRADE_MAX))
   allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr"))))
-  allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= 2 | effect %in% POOLED_EFFECTS[["LoF"]])))
+  allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= RESISTANCE_GRADE_MAX | effect %in% POOLED_EFFECTS[[LOF_LABEL]])))
   allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant")))
   allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS)))
   compTabs[["INH"]] = allTabs
@@ -154,7 +154,7 @@ computeSensSpec = function(fullDataset,
   fullDataset = fullDataset %>%
     mutate(drug_short = SHORT_NAMES[match(drug, DRUG_LIST)]) %>%
     group_by(sample_id) %>%
-    mutate(genoRIF          = (drug_short == "RIF" & ((!is.na(Final) & Final <= 2) | RRDR_NON_SILENT))) %>%
+    mutate(genoRIF          = (drug_short == "RIF" & ((!is.na(Final) & Final <= RESISTANCE_GRADE_MAX) | RRDR_NON_SILENT))) %>%
     mutate(RIF_geno_Relaxed = any(genoRIF & !het_relaxed), RIF_geno_Strict  = any(genoRIF & !het_strict))
   if (sameRIF) {
     fullDataset %<>%
@@ -206,7 +206,7 @@ computeSensSpec = function(fullDataset,
     ungroup()
   ## Calculate the size of groups 1, 2, 3, 1 + 2, and 1 + 2 + 3, with both regular and relaxed thresholds and each RIF_geno status, for each drug
   finalTabs = vector("list", 3 * 2 * 5 * 8) %>%
-    magrittr::set_names(outer(paste0("Lineage", c(1:6, "Other", "Any")), outer(c("R", "S", "ALL"), outer(c("Regular", "Relaxed"), STAGES, 
+    magrittr::set_names(outer(paste0("Lineage", c(1:6, LINEAGE_OTHER, LINEAGE_ANY)), outer(c("R", "S", "ALL"), outer(c("Regular", "Relaxed"), STAGES,
                     function(x, y) {paste0(x, "_", y)}), function(z, w) {paste0("RIF", z, "_", w)}), function(a, b) {paste0(a, "_", b)}))
   for (relax in c(FALSE, TRUE)) {
     if (relax) {
@@ -223,8 +223,8 @@ computeSensSpec = function(fullDataset,
       } else {
         curSubset = curDataset
       }
-      for (Lineage in c("Any", as.character(1:6), "Other")) {
-        if (Lineage == "Any") {
+      for (Lineage in c(LINEAGE_ANY, as.character(1:6), LINEAGE_OTHER)) {
+        if (Lineage == LINEAGE_ANY) {
           curSuperTab = curSubset
         } else {
           curSuperTab = curSubset %>%

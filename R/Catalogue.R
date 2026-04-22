@@ -44,7 +44,7 @@ applyCatalogue = function(inputData, catalogueFile, minMAF = MAF_THRESHOLD_REGUL
     LoFTab = catalogueData %>%
       dplyr::filter(str_detect(variant, "_LoF")) %>%
       mutate(gene = str_remove(variant, "_LoF")) %>%
-      dplyr::filter(Final <= 2L)
+      dplyr::filter(Final <= RESISTANCE_GRADE_MAX)
     ### For v2, DLM/PMD cross-resistance, add genes that have an LoF graded 1/2
     if (version == PREV_VERSION) {
       extraTab = LoFTab %>%
@@ -60,7 +60,7 @@ applyCatalogue = function(inputData, catalogueFile, minMAF = MAF_THRESHOLD_REGUL
   if (LoF) {
     mergedData = mergedData %>%
       mutate(LoF_candidate = (paste0(gene, drug, sep = "_") %in% paste0(LoFTab$gene, LoFTab$drug, sep = "_") 
-                              & effect %in% POOLED_EFFECTS[["LoF"]] & is.na(Final))) %>%
+                              & effect %in% POOLED_EFFECTS[[LOF_LABEL]] & is.na(Final))) %>%
       mutate(Final = ifelse(LoF_candidate, 2L, Final))
   }
   # Return the merged data
@@ -76,7 +76,7 @@ applyThresholds = function(inputData, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet 
   if ('max(af)' %in% colnames(inputData) && !is.na(minMAF)) {
     if (lowMAFHet) {
       inputData = inputData %>%
-        mutate(het = (`max(af)` < minMAF | variant == "missing"))
+        mutate(het = (`max(af)` < minMAF | variant == MISSING_VARIANT))
     } else {
       inputData = inputData %>%
         dplyr::filter(is.na(`max(af)`) | `max(af)` >= minMAF)

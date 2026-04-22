@@ -71,6 +71,7 @@ DCS_SPEC_VAR         = paste(DCS_GENE, "p.Gly122Ser", sep = "_")
 SPECIAL_DLM_VAR      = paste(DLM_GENE[1], "p.Leu49Pro", sep = "_")
 
 ## Special-status effects
+LOF_LABEL            = "LoF"
 POOLED_EFFECTS       = list(LoF = c(paste0(c("feature", "transcript"), "_ablation"), "frameshift", "start_lost", "stop_gained"))
 INFRAME_EFFECTS      = paste0("inframe_", c("deletion", "insertion"))
 ADDITIONAL_EFFECTS   = c(POOLED_EFFECTS[["LoF"]], INFRAME_EFFECTS, "missense_variant")
@@ -78,6 +79,7 @@ BDQ_EFFECTS          = c(ADDITIONAL_EFFECTS, "stop_lost")
 SILENT_EFFECTS          = c("initiator_codon_variant", "stop_retained_variant", "synonymous_variant")
 NEUTRAL_LOGICAL_COLUMNS = c(paste0("set", LETTERS[1:5]), "lit_mutation", "prev_version")
 UPSTREAM_VAR         = "upstream_gene_variant"
+MISSING_VARIANT      = "missing"
 INDEL_EFFECTS        = c(INFRAME_EFFECTS, paste0(c("feature", "transcript"), "_ablation"), "frameshift")
 
 ## Useful constants and thresholds
@@ -96,6 +98,10 @@ QUALITY_THRESHOLD_RELAXED = 250
 MAF_THRESHOLDS     = c(strict = MAF_THRESHOLD_STRICT,     regular = MAF_THRESHOLD_REGULAR,     relaxed = MAF_THRESHOLD_RELAXED)
 QUALITY_THRESHOLDS = c(strict = QUALITY_THRESHOLD_STRICT, regular = QUALITY_THRESHOLD_REGULAR, relaxed = QUALITY_THRESHOLD_RELAXED)
 
+RESISTANCE_GRADE_MAX   = 2L
+MIN_SOLO_COUNT_UPGRADE = 5L
+PPVC_UPGRADE_THRESHOLD = 0.5
+
 ## Grades used to prioritise variants
 GRADES = paste0(c("", "not "), "assoc w ") %>% 
   str_to_sentence() %>%
@@ -110,6 +116,17 @@ FINAL_FLAG       = 6
 MAX_GRADE        = 6
 LAST_INITIAL_RULE = 15L
 FIRST_RULE_NUM    = LAST_INITIAL_RULE + 1L
+
+## Lineage groupings
+LINEAGE_OTHER = "Other"
+LINEAGE_ANY   = "Any"
+
+## Output file names
+WITHLOFS_SUFFIX               = "_withLoFs"
+STATS_FILE_PREFIX             = "Stats_"
+GRADED_CATALOGUE_PREFIX       = "Final_graded_algorithm_catalogue"
+COMPLETE_DATASET_FILENAME     = "CompleteDataset.csv"
+COMPLETE_DATASET_WHO_FILENAME = "CompleteDatasetWHO.csv"
 
 ## Process-specific tables
 ## PHENO_GROUPS    = tibble(category_phenotype = c("ALL", "WHO", "CC", "CC-ATU"), group = c("MAIN", "MAIN", "CC", "ATU"))

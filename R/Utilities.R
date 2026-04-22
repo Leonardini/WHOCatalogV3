@@ -195,7 +195,7 @@ mergeCountColumns = function(initTab) adjustDuplicateColumns(initTab, warn = FAL
 prepMask = function(inputTab, Silent = FALSE, Tier2 = TRUE, Neutral = TRUE, Pool = NA, SOnly = TRUE) {
   if (Silent) {
     inputTab %<>%
-      dplyr::filter(effect == "missing" | !(effect %in% SILENT_EFFECTS))
+      dplyr::filter(effect == MISSING_VARIANT | !(effect %in% SILENT_EFFECTS))
   }
   if (Tier2) {
     inputTab %<>%
@@ -207,7 +207,7 @@ prepMask = function(inputTab, Silent = FALSE, Tier2 = TRUE, Neutral = TRUE, Pool
   }
   if (!is.na(Pool)) { ## Minor fix for a bug identified by Sacha, 3rd July 2024
     inputTab %<>%
-      dplyr::filter(str_ends(variant, Pool) | effect == "missing" | (effect %in% POOLED_EFFECTS[[Pool]] & het) | !(effect %in% POOLED_EFFECTS[[Pool]]))
+      dplyr::filter(str_ends(variant, Pool) | effect == MISSING_VARIANT | (effect %in% POOLED_EFFECTS[[Pool]] & het) | !(effect %in% POOLED_EFFECTS[[Pool]]))
   }
   if (SOnly) {
     inputTab %<>%

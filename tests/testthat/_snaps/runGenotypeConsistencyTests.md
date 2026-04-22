@@ -20,7 +20,7 @@
       runGenotypeConsistencyTests(df)
     Condition
       Error in `runGenotypeConsistencyTests()`:
-      ! all((allGenotypes$mutation == "missing") == (allGenotypes$effect ==  .... is not TRUE
+      ! all((allGenotypes$mutation == MISSING_VARIANT) == (allGenotypes$effect ==  .... is not TRUE
 
 # runGenotypeConsistencyTests errors when effect is inconsistent for the same variant
 

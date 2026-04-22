@@ -6,8 +6,8 @@ preprocessGenotypes = function(allGenotypes, minMAF = MAF_THRESHOLD_REGULAR, low
     rename(gene = 'resolved_symbol', mutation = 'variant_category', effect = 'predicted_effect') %>%
     select(-neutral) %>%
     ## Replace missing mutations or effects by "missing", then create a variant out of gene and mutation
-    mutate(across(c(mutation, effect), ~replace_na(., "missing"))) %>%
-    mutate(variant = ifelse(mutation == "missing", "missing", paste(gene, mutation, sep = "_"))) %>%
+    mutate(across(c(mutation, effect), ~replace_na(., MISSING_VARIANT))) %>%
+    mutate(variant = ifelse(mutation == MISSING_VARIANT, MISSING_VARIANT, paste(gene, mutation, sep = "_"))) %>%
     ## Mark any genotype entry with a low MAF or a missing variant (i.e. a sequencing defect in the gene) as a het
     applyVariantPostprocessing(minMAF = minMAF, lowMAFHet = lowMAFHet, minQ = minQ, lowQHet = lowQHet)
 }
@@ -102,7 +102,7 @@ computeVariantStats = function(curSet, curExtraCounts, curExtraSolos) {
   ## Note that hets are removed at the beginning!
   ## Also adjust the variant and solo counts for samples excluded due to QC by adding the extra counts to each.
   curStats = curSet %>%
-    dplyr::filter(!het & variant != "missing") %>% ## TODO: REVISIT THE LOGIC OF MISSING VARIANTS IN SENS-SPEC!
+    dplyr::filter(!het & variant != MISSING_VARIANT) %>% ## TODO: REVISIT THE LOGIC OF MISSING VARIANTS IN SENS-SPEC!
     rename(datasets = category_phenotype) %>%
     group_by(drug, variant) %>%
     mutate(present = n(), present_R = sum(phenotype == "R"), present_S = present - present_R) %>%
@@ -131,14 +131,14 @@ adjustStatsForRemovedMutations = function(curStats, curDataset, mutationsToRemov
     unique()
   message(paste("Removing", length(extraIsolates), "isolates at stage", curStage))
   extraDenominators = curDataset %>% ## TODO: Make sure that we only need to subtract non-het non-missing counts!
-    dplyr::filter(stage == curStage & sample_id %in% extraIsolates & !het & variant != "missing") %>%
+    dplyr::filter(stage == curStage & sample_id %in% extraIsolates & !het & variant != MISSING_VARIANT) %>%
     group_by(drug, variant) %>%
     summarise(present = -n(), present_R = -sum(phenotype == "R"), present_S = -sum(phenotype == "S"), .groups = "drop")
   # Calculate SOLO counts to subtract (NEW) - suggested by Claude!
   extraSoloSubtract = tibble(drug = character(), variant = character(), SOLO_R = integer(), SOLO_S = integer())
   if (length(extraIsolates) > 0) {
     extraPhenotypes = curDataset %>%
-      dplyr::filter(sample_id %in% extraIsolates & stage == curStage & variant != "missing") %>%
+      dplyr::filter(sample_id %in% extraIsolates & stage == curStage & variant != MISSING_VARIANT) %>%
       distinct(drug, sample_id, phenotype)
     extraSoloSubtract = soloIsolates %>%
       dplyr::filter(sample_id %in% extraIsolates) %>%
@@ -166,7 +166,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
   for (name in c("WHO", "MAIN")) { ## SEPT 8, 2025: Removing the CC and ATU options as they were only used in v2
     fullStats = tibble()
     ## Sanity check: ensures that there is only one non-missing variant of each name per drug-sample combination
-    stopifnot(anyDuplicated(fullDataset[[name]] %>% dplyr::filter(variant != "missing") %>% select(drug, sample_id, variant)) == 0)
+    stopifnot(anyDuplicated(fullDataset[[name]] %>% dplyr::filter(variant != MISSING_VARIANT) %>% select(drug, sample_id, variant)) == 0)
     for (pool in c(NA, names(POOLED_EFFECTS))) {
       POOLED = !is.na(pool)
       message(paste("Processing the combination of", name, "and", ifelse(POOLED, pool, "no"), "pooling"))
@@ -188,7 +188,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
           mutate(variant  = ifelse(RRDR_NON_SILENT & !het, paste0("RRDR", "_", pool), variant)) %>%
           mutate(across(all_of(c("max(af)", "position", "max(quality)")), ~ifelse(str_ends(variant, pool), NA, .))) %>%
           mutate(neutral  = ifelse(str_ends(variant, pool), FALSE, neutral)) %>%
-          mutate(effect   = ifelse(str_ends(variant, pool), "LoF", effect)) %>%
+          mutate(effect   = ifelse(str_ends(variant, pool), LOF_LABEL, effect)) %>%
           distinct(drug, sample_id, gene, variant, .keep_all = TRUE)
       }
       curSet = markStages(curSet)
@@ -213,7 +213,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
         }
         relevantOutputs = relevantOutputs[[1]]
         relevantOutputs = relevantOutputs %>%
-          dplyr::filter(variant != "missing")
+          dplyr::filter(variant != MISSING_VARIANT)
         if (stage == 1) { ## Save the first stage results for future reference
           firstOutputs = relevantOutputs
         } else { ## In stages 2 and 3, remove the results of any pairs that were analysed in the first stage (i.e. tier 1 variants)
@@ -244,7 +244,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
       stageStats[[useName]]  = curStats
     }
     ## Save the basic mutation-wise statistics into a file
-    curFilename = paste0("Stats_", name, ifelse(LoF, "_withLoFs", ""), "_Stage1.csv")
+    curFilename = paste0(STATS_FILE_PREFIX, name, ifelse(LoF, WITHLOFS_SUFFIX, ""), "_Stage1.csv")
     write_csv(fullStats, file.path(OUTPUT_DIRECTORY, paste0("Basic_", curFilename)))
     ## Now compute the derived statistics and save them into a file
     fullStats %<>%
@@ -288,7 +288,7 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
             initStats %<>%
               computeCatalogueStats(correct_all = correct_all)
             redName = str_split_fixed(name, "_", 2)[,1]
-            curFilename = paste0("Stats_", redName, ifelse(LoF, "_withLoFs", ""), "_Stage", curStage, ".csv")
+            curFilename = paste0(STATS_FILE_PREFIX, redName, ifelse(LoF, WITHLOFS_SUFFIX, ""), "_Stage", curStage, ".csv")
             write_csv(initStats, file.path(OUTPUT_DIRECTORY, curFilename))
           }
         }
@@ -296,7 +296,7 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
     }
     gradedCatalog = gradeMutations(LoF = LoF, NON_DATABASE_DIRECTORY = str_remove(NON_DATABASE_DIRECTORY, "/$"), stage = curStage, outDir = OUTPUT_DIRECTORY)
   }
-  catalogFiles = file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", Sys.Date(), "_withLoFs_Stage", 1:3, ".csv"))
+  catalogFiles = file.path(OUTPUT_DIRECTORY, paste0(GRADED_CATALOGUE_PREFIX, "_", Sys.Date(), WITHLOFS_SUFFIX, "_Stage", 1:3, ".csv"))
   finalCatalog = tibble()
   for (curStage in 1:3) {
     curSubCatalog = read_csv(catalogFiles[curStage]) %>%
@@ -337,7 +337,7 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
   cnames = c(setdiff(cnames, countNames), countNames)
   finalCatalog = finalCatalog %>%
     select(all_of(cnames))
-  write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", format(Sys.Date(), "%d%b%Y"), "_withLoFs_and_counts.csv")))
+  write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0(GRADED_CATALOGUE_PREFIX, "_", format(Sys.Date(), "%d%b%Y"), WITHLOFS_SUFFIX, "_and_counts.csv")))
   finalCatalog
 }
 
@@ -425,13 +425,13 @@ mainDriver = function(correct_all = TRUE,
   ## Now identify the neutral variants and mark these, as well as other relevant ones, in the entire dataset
   fullDataset = annotateDatasets(fullDataset, samplesToExclude, allNeutrals)
   ## Save the clean version of the input data for downstream analysis of the catalogue's performance on itself
-  write_csv(fullDataset[["MAIN"]], file.path(OUTPUT_DIRECTORY, "CompleteDataset.csv"))
-  write_csv(fullDataset[["WHO"]], file.path(OUTPUT_DIRECTORY, "CompleteDatasetWHO.csv"))
+  write_csv(fullDataset[["MAIN"]], file.path(OUTPUT_DIRECTORY, COMPLETE_DATASET_FILENAME))
+  write_csv(fullDataset[["WHO"]], file.path(OUTPUT_DIRECTORY, COMPLETE_DATASET_WHO_FILENAME))
   result      = runSOLOPipelinePerDataset(fullDataset, samplesToExclude, OUTPUT_DIRECTORY, LoF, listIsolates, correct_all)
   fullDataset = result$fullDataset
   stageStats  = result$stageStats
   finalCatalog = computeFinalGrades(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all)
-  write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", format(Sys.Date(), "%d%b%Y"), "_withLoFs.csv")))
+  write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0(GRADED_CATALOGUE_PREFIX, "_", format(Sys.Date(), "%d%b%Y"), WITHLOFS_SUFFIX, ".csv")))
   reducedGradedCatalog = finalCatalog %>%
     select(c(drug, variant, Initial_Confidence_Grading, Supplementary_Grading_Considerations,	Final_Confidence_Grading))
   write_csv(reducedGradedCatalog, file = file.path(OUTPUT_DIRECTORY, paste0("List_of_graded_variants_", format(Sys.Date(), "%d%b%Y"), ".csv")))
@@ -463,7 +463,7 @@ getLineageData = function(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRU
   lineageData = computeDominantLineage(lineageRaw, mafThresholds = MAF_THRESHOLD_REGULAR, subLineage = useSublineageData)[[paste0("maf", MAF_THRESHOLD_REGULAR)]] %>%
     select(sample_id, dominant_lineage) %>%
     rename(lineage = dominant_lineage) %>%
-    mutate(lineage = ifelse(!str_detect(lineage, "^\\d"), "Other", lineage))
+    mutate(lineage = ifelse(!str_detect(lineage, "^\\d"), LINEAGE_OTHER, lineage))
   lineageData
 }
 
@@ -477,7 +477,7 @@ runGenotypeConsistencyTests = function(allGenotypes) {
     mutate(aa_start = ifelse(str_starts(mutation, "p.") & is.na(pos2), str_sub(mutation, 3, 5), NA))
   stopifnot(all(testConsistent(allGenotypes %>% dplyr::filter(!is.na(aa_start)), c("gene", "pos1"), consistentVars = c("aa_start"))[[1]]))
   ## the mutation is missing if and only if the effect is missing
-  stopifnot(all((allGenotypes$mutation == "missing") == (allGenotypes$effect == "missing")))
+  stopifnot(all((allGenotypes$mutation == MISSING_VARIANT) == (allGenotypes$effect == MISSING_VARIANT)))
   ## same effect and position for each variant-drug combination
   stopifnot(all(testConsistent(allGenotypes, c("drug", "variant"), consistentVars = c("effect", "position"))[[1]]))
   ## same tier for each gene-drug combination

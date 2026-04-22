@@ -16,12 +16,12 @@ neutralAlgorithm = function(masterTab, litTab,
                        LoF = TRUE, version = PREV_VERSION)
       ## Computing the rows to be marked with rm = TRUE (Final <= 2); also converting rm to a logical variable (meaning NA -> FALSE)
       masterTab = masterTab %>%
-        mutate(rm = (Final <= 2L)) %>%
+        mutate(rm = (Final <= RESISTANCE_GRADE_MAX)) %>%
         mutate(rm = convertToLogical(rm))
       # Variants in some selected tier 1 genes that have an LoF mutation are also RMs
       masterTab %<>%
         mutate(rm = or(rm, paste0(drug, gene, sep = "_") %in% paste0(NEW_PAIRS_RM$drug, NEW_PAIRS_RM$gene, sep = "_") 
-                       & effect %in% POOLED_EFFECTS[["LoF"]] & tier == 1))
+                       & effect %in% POOLED_EFFECTS[[LOF_LABEL]] & tier == 1))
       ## Mark any sample-drug pair with at least one of the variants being a resistance mutation
       masterTab %<>%
         group_by(sample_id, drug) %>%
@@ -33,7 +33,7 @@ neutralAlgorithm = function(masterTab, litTab,
       computePPVs(removeRM = (set == "B"))
     ## Place the variant-drug combinations with PPV_ub < threshold into the set
     masterTab %<>%
-      mutate(set = (!is.na(variant) & !(variant == "missing") & (!is.na(PPV_ub)) & (PPV_ub < PPV_UB_THRESHOLD)))
+      mutate(set = (!is.na(variant) & !(variant == MISSING_VARIANT) & (!is.na(PPV_ub)) & (PPV_ub < PPV_UB_THRESHOLD)))
     ## Change the set name according to its letter
     colnames(masterTab)[ncol(masterTab)] = paste0("set", set)
     ## Extract the neutral variants into a separate file
