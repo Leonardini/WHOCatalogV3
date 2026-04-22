@@ -463,7 +463,7 @@ getLineageData = function(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRU
   lineageData = computeDominantLineage(lineageRaw, mafThresholds = MAF_THRESHOLD_REGULAR, subLineage = useSublineageData)[[paste0("maf", MAF_THRESHOLD_REGULAR)]] %>%
     select(sample_id, dominant_lineage) %>%
     rename(lineage = dominant_lineage) %>%
-    mutate(lineage = ifelse(!(str_sub(lineage, 1, 1) %in% as.character(1:6)), "Other", lineage))
+    mutate(lineage = ifelse(!str_detect(lineage, "^\\d"), "Other", lineage))
   lineageData
 }
 
