@@ -1,3 +1,5 @@
+testthat::local_edition(3)
+
 make_ac_row <- function(drug, gene, mutation, effect = "missense_variant") {
   tibble(
     drug     = drug,
@@ -9,7 +11,6 @@ make_ac_row <- function(drug, gene, mutation, effect = "missense_variant") {
 }
 
 test_that("applyCatalogue errors when required columns are missing", {
-  testthat::local_edition(3)
   tf <- withr::local_tempfile(fileext = ".csv")
   write_csv(tibble(drug = "x", variant = "y", Final_Confidence_Grading = GRADES[3L]), tf)
   expect_snapshot(
@@ -25,11 +26,10 @@ test_that("applyCatalogue assigns the catalogue grade to a matching variant", {
            Final_Confidence_Grading = GRADES[1L]),
     tf
   )
-  out <- applyCatalogue(
-    make_ac_row("Isoniazid", "katG", "p.Ser315Thr"),
-    tf, minMAF = NA, minQ = NA, LoF = FALSE
+  expect_snapshot(
+    applyCatalogue(make_ac_row("Isoniazid", "katG", "p.Ser315Thr"),
+                   tf, minMAF = NA, minQ = NA, LoF = FALSE)
   )
-  expect_equal(out$Final, 1L)
 })
 
 test_that("applyCatalogue leaves Final as NA for variants not in the catalogue", {
@@ -39,11 +39,10 @@ test_that("applyCatalogue leaves Final as NA for variants not in the catalogue",
            Final_Confidence_Grading = GRADES[1L]),
     tf
   )
-  out <- applyCatalogue(
-    make_ac_row("Isoniazid", "katG", "p.Arg463Leu"),
-    tf, minMAF = NA, minQ = NA, LoF = FALSE
+  expect_snapshot(
+    applyCatalogue(make_ac_row("Isoniazid", "katG", "p.Arg463Leu"),
+                   tf, minMAF = NA, minQ = NA, LoF = FALSE)
   )
-  expect_true(is.na(out$Final))
 })
 
 test_that("applyCatalogue sets Final = 2 for unmatched RRDR non-silent variants", {
@@ -53,11 +52,10 @@ test_that("applyCatalogue sets Final = 2 for unmatched RRDR non-silent variants"
            Final_Confidence_Grading = GRADES[1L]),
     tf
   )
-  out <- applyCatalogue(
-    make_ac_row("Rifampicin", "rpoB", "p.Ser450Leu"),
-    tf, minMAF = NA, minQ = NA, LoF = FALSE
+  expect_snapshot(
+    applyCatalogue(make_ac_row("Rifampicin", "rpoB", "p.Ser450Leu"),
+                   tf, minMAF = NA, minQ = NA, LoF = FALSE)
   )
-  expect_equal(out$Final, 2L)
 })
 
 test_that("applyCatalogue sets Final = 2 for unmatched LoF variants when pooled LoF is graded 1 or 2", {
@@ -67,11 +65,10 @@ test_that("applyCatalogue sets Final = 2 for unmatched LoF variants when pooled 
            Final_Confidence_Grading = GRADES[1L]),
     tf
   )
-  out <- applyCatalogue(
-    make_ac_row("Isoniazid", "katG", "p.Ala12Val", effect = "frameshift"),
-    tf, minMAF = NA, minQ = NA, LoF = TRUE
+  expect_snapshot(
+    applyCatalogue(make_ac_row("Isoniazid", "katG", "p.Ala12Val", effect = "frameshift"),
+                   tf, minMAF = NA, minQ = NA, LoF = TRUE)
   )
-  expect_equal(out$Final, 2L)
 })
 
 test_that("applyCatalogue does not apply the LoF rule when LoF = FALSE", {
@@ -81,9 +78,8 @@ test_that("applyCatalogue does not apply the LoF rule when LoF = FALSE", {
            Final_Confidence_Grading = GRADES[1L]),
     tf
   )
-  out <- applyCatalogue(
-    make_ac_row("Isoniazid", "katG", "p.Ala12Val", effect = "frameshift"),
-    tf, minMAF = NA, minQ = NA, LoF = FALSE
+  expect_snapshot(
+    applyCatalogue(make_ac_row("Isoniazid", "katG", "p.Ala12Val", effect = "frameshift"),
+                   tf, minMAF = NA, minQ = NA, LoF = FALSE)
   )
-  expect_true(is.na(out$Final))
 })
