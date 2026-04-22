@@ -159,103 +159,20 @@ adjustStatsForRemovedMutations = function(curStats, curDataset, mutationsToRemov
     distinct(drug, variant, .keep_all = TRUE)
 }
 
-#' Execute the complete analysis required to create version 2 or 3 of the WHO catalogue
-#' @param correct_all Logical; if TRUE, FDR correction uses all variants; if FALSE, only variants appearing as a SOLO in at least one isolate.
-#' @param LoF Logical; if TRUE, pooled LoF mutations are included as hypotheses for FDR correction.
-#' @param safe Logical; if TRUE, performs a full from-scratch conversion of variants across versions (slow).
-#' @param minMAF Minimum minor allele frequency; variants below this threshold are treated as heterozygous.
-#' @param lowMAFHet Logical; if TRUE, low-MAF variants become hets; if FALSE, they are filtered out.
-#' @param minQ Minimum quality score; variants below this threshold are treated as heterozygous.
-#' @param lowQHet Logical; if TRUE, low-quality variants become hets; if FALSE, they are filtered out.
-#' @param EXTRACTION_ID Identifier string for the database extraction (used to locate input files); defaults to the package constant EXTRACTION_ID.
-#' @param listIsolates Logical; if TRUE, records all isolates classified as solo at each iteration.
-#' @param augmentWithOrphansAndLineage Logical; if TRUE, add a breakdown by sub-lineage and the number of orphans.
-#' @param OUTPUT_DIRECTORY Directory for writing output files; defaults to Results/<EXTRACTION_ID>.
-#' @param DATA_DIRECTORY Directory containing the database extraction files.
-#' @param NON_DATABASE_DIRECTORY Directory containing non-database reference files (defaults to inst/extdata).
-#' @export
-mainDriver = function(correct_all = TRUE,
-                      LoF = TRUE, 
-                      safe = TRUE,
-                      minMAF = MAF_THRESHOLD_REGULAR, 
-                      lowMAFHet = TRUE, 
-                      minQ = QUALITY_THRESHOLD_STRICT, 
-                      lowQHet = TRUE, 
-                      EXTRACTION_ID = EXTRACTION_ID,
-                      listIsolates = TRUE,
-                      augmentWithOrphansAndLineage = TRUE,
-                      OUTPUT_DIRECTORY = paste0("Results/", EXTRACTION_ID),
-                      DATA_DIRECTORY         = "SOLO Algorithm Input files/DATABASE EXTRACTION files/",
-                      NON_DATABASE_DIRECTORY = system.file("extdata", package = "SOLOport")) {
-  DATA_DIRECTORY %<>%
-    normalizePath()
-  NON_DATABASE_DIRECTORY %<>%
-    normalizePath()
-  dir.create(OUTPUT_DIRECTORY, recursive = TRUE)
-  OUTPUT_DIRECTORY %<>%
-    normalizePath()
-  ## Initial preprocessing of the genotypes: extract all the genotypes, recording the drug and the tier
-  print("Extracting the genotypes")
-  allGenotypes  = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "full_genotypes/", sep = "/"),
-                              drugList = DRUG_LIST, geno = TRUE)
-  ## Make sure there are no missing or empty resolved symbols
-  stopifnot(!any(is.na(allGenotypes$resolved_symbol)))
-  allGenotypes = preprocessGenotypes(allGenotypes, minMAF = minMAF, minQ = minQ)
-  runGenotypeConsistencyTests(allGenotypes)
-  ## Initial preprocessing of the phenotypes: extract all the phenotypes, recording the drug
-  print("Extracting the phenotypes")
-  allPhenotypes = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "phenotypes/", sep="/"),
-                              drugList = DRUG_LIST, geno = FALSE)
-  ## Rename one column for convenience and remove an unused column
-  allPhenotypes = allPhenotypes %>% 
-    rename(category_phenotype = 'phenotypic_category') %>%
-    select(-"box")
-  runPhenotypeConsistencyTests(allPhenotypes)
-  ## Merge the genotypes and the phenotypes after separating the latter by phenotypic category group
-  fullDataset = mergeGenoPheno(allGenotypes, allPhenotypes, phenoGroups = PHENO_GROUPS)
-  samplesToExclude = identifySamplesToExclude(fullDataset[["MAIN"]])
-  ## Record the sample_ids that need to be excluded
-  write_csv(samplesToExclude, file.path(OUTPUT_DIRECTORY, "excluded_after_qc.csv"))
-  ## Set the data with WHO phenotype and add it to the dataset; it will be used to determine neutral variants
-  WHOData = fullDataset[["MAIN"]] %>%
-    dplyr::filter(category_phenotype == "WHO")
-  fullDataset[["WHO"]] = WHOData
-  ## Replace the phenotype in the MAIN dataset with "ALL"
-  fullDataset[["MAIN"]] %<>%
-    mutate(category_phenotype = "ALL")
-  ## (Re)run the neutral algorithm to create the files containing neutral mutations (note that this is a side effect)
-  if (safe) {
-    litTab = read_csv(file.path(str_remove(NON_DATABASE_DIRECTORY, "/$"), "literature_neutrals.csv"),
-                      show_col_types = FALSE, guess_max = LARGE_NUMBER)
-    WHODataMarked = WHOData %>%
-      dplyr::filter(!(sample_id %in% samplesToExclude$sample_id)) %>%
-      neutralAlgorithm(litTab = litTab, NON_DATABASE_DIRECTORY = str_remove(NON_DATABASE_DIRECTORY, "/$"))
-    writeNeutralOutputs(WHODataMarked, safe = safe, outDir = OUTPUT_DIRECTORY)
-  }
-  ## Extract the prepared list of all neutral mutations
-  ## TODO: Consider doing this with an in-memory variable
-  allNeutrals = read_csv(file.path(OUTPUT_DIRECTORY, "neutral_mutations_WHO_F.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
-    mutate(neutral = TRUE)
-  ## Now identify the neutral variants and mark these, as well as other relevant ones, in the entire dataset
-  fullDataset = annotateDatasets(fullDataset, samplesToExclude, allNeutrals)
-  ## Save the clean version of the input data for downstream analysis of the catalogue's performance on itself 
-  write_csv(fullDataset[["MAIN"]], file.path(OUTPUT_DIRECTORY, "CompleteDataset.csv"))
-  write_csv(fullDataset[["WHO"]], file.path(OUTPUT_DIRECTORY, "CompleteDatasetWHO.csv"))
+#' Run the SOLO pipeline for all datasets and pooling modes, returning updated fullDataset and stageStats
+#' @noRd
+runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIRECTORY, LoF, listIsolates, correct_all) {
   stageStats = vector("list", nrow(PHENO_GROUPS) * (length(POOLED_EFFECTS) + 1))
-  ## Now process the entire dataset in the specified order; additionally perform pooling
   for (name in c("WHO", "MAIN")) { ## SEPT 8, 2025: Removing the CC and ATU options as they were only used in v2
-    ## Placeholder for the primary statistics (and possibly the solo isolates)
     fullStats = tibble()
-    fullIsolates = tibble()
     ## Sanity check: ensures that there is only one non-missing variant of each name per drug-sample combination
     stopifnot(anyDuplicated(fullDataset[[name]] %>% dplyr::filter(variant != "missing") %>% select(drug, sample_id, variant)) == 0)
     for (pool in c(NA, names(POOLED_EFFECTS))) {
-      curIsolates = tibble()
       POOLED = !is.na(pool)
       print(paste("Processing the combination of", name, "and", ifelse(POOLED, pool, "no"), "pooling"))
       ## Extract the dataset corresponding to the name
       curSet = fullDataset[[name]]
-      excluded     = computeExcludedCounts(curSet, samplesToExclude, name)
+      excluded       = computeExcludedCounts(curSet, samplesToExclude, name)
       curExtraCounts = excluded$extraCounts
       curExtraSolos  = excluded$extraSolos
       curSet %<>%
@@ -273,7 +190,7 @@ mainDriver = function(correct_all = TRUE,
           mutate_at("neutral", ~{ ifelse(str_ends(variant, pool), FALSE, .) }) %>%
           mutate_at("effect",  ~{ ifelse(str_ends(variant, pool), "LoF", .) }) %>%
           distinct(drug, sample_id, gene, variant, .keep_all = TRUE)
-      } 
+      }
       curSet = markStages(curSet)
       for (stage in 1:ifelse(POOLED, 2, 3)) { ## NOTE: stage 0 is removed as it only counts the neutral variants
         print(paste("Processing stage", stage))
@@ -288,7 +205,7 @@ mainDriver = function(correct_all = TRUE,
           relevantSet = prepMask(curSet, Silent = FALSE, Tier2 = TRUE,  Neutral = TRUE,  Pool = NA,   SOnly = TRUE)
         }
         ## Run the SOLO pipeline for 1 step of the algorithm; record stage
-        relevantOutputs = runSOLOPipeline(relevantSet, maxIter = 1L, stage = stage, removeSOnly = TRUE, 
+        relevantOutputs = runSOLOPipeline(relevantSet, maxIter = 1L, stage = stage, removeSOnly = TRUE,
                                           listIsolates = listIsolates)
         if (listIsolates) {
           relevantIsolates = relevantOutputs[[2]]
@@ -334,6 +251,12 @@ mainDriver = function(correct_all = TRUE,
       computeCatalogueStats(correct_all = correct_all)
     write_csv(fullStats, file.path(OUTPUT_DIRECTORY, curFilename))
   }
+  list(fullDataset = fullDataset, stageStats = stageStats)
+}
+
+#' Grade mutations stage by stage and assemble the final catalogue
+#' @noRd
+computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all) {
   print("Computing the final grades of all mutations")
   stopifnot(length(POOLED_EFFECTS) == 1) ## Ensure that there is exactly one pool, as otherwise the simplified logic below breaks!
   ## CHANGE ON SEPT 11, 2025: the grading is now stage-wise and samples with grade 1/2 mutations are ignored in subsequent stages!
@@ -358,7 +281,7 @@ mainDriver = function(correct_all = TRUE,
           adjustedStats %<>%
             anti_join(initStats, by = c("drug", "variant")) %>%
             mutate(correctAll = LoF, correctSOLO = LoF)
-          stopifnot(all(str_ends(adjustedStats$variant, pool)))
+          stopifnot(all(str_ends(adjustedStats$variant, names(POOLED_EFFECTS)[[1]])))
           initStats %<>%
             rbind(adjustedStats)
           if (str_ends(name, tail(names(POOLED_EFFECTS), 1))) {
@@ -387,37 +310,131 @@ mainDriver = function(correct_all = TRUE,
   manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
     select(drug, variant, Supplementary_Grading_Considerations, Final_Confidence_Grading) %>%
     mutate_at("Supplementary_Grading_Considerations", ~{str_replace(., "Additional grading evidence", "Evidence")})
-  ## End of new block
-  finalCatalog = applyManualChecks(finalCatalog, manual_check_results)
+  applyManualChecks(finalCatalog, manual_check_results)
+}
+
+#' Augment the final catalogue with orphan and lineage breakdown counts
+#' @noRd
+augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, DATA_DIRECTORY, EXTRACTION_ID, minMAF, minQ, OUTPUT_DIRECTORY) {
+  orphanTab  = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID, minMAF = minMAF, minQ = minQ)
+  lineageTab = getLineageData(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRUE)
+  mainTab = fullDataset[["MAIN"]]
+  fullTab = mainTab %>%
+    bind_rows(orphanTab) %>%
+    left_join(lineageTab, by = "sample_id") %>%
+    pivot_wider(names_from = lineage, values_from = lineage, values_fill = list(lineage = 0), values_fn = length)
+  colnames(fullTab)[-(1:ncol(mainTab))] = paste0("lineage_", colnames(fullTab)[-(1:ncol(mainTab))])
+  fullCounts = fullTab %>%
+    dplyr::filter(!het & !(sample_id %in% samplesToExclude$sample_id)) %>%
+    group_by(drug, variant) %>%
+    summarise(across(starts_with('lineage'), sum),
+              count = n(), orphan_count = sum(phenotype == "U"), .groups = "drop")
+  finalCatalog = finalCatalog %>%
+    full_join(fullCounts, by = c("drug", "variant")) %>%
+    mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)}))
+  cnames = colnames(finalCatalog)
+  countNames = cnames[str_detect(cnames, "lineage_")]
+  countNames = countNames[order(str_remove(countNames, "lineage_") %>% as.numeric())]
+  cnames = c(setdiff(cnames, countNames), countNames)
+  finalCatalog = finalCatalog %>%
+    select(all_of(cnames))
+  write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", format(Sys.Date(), "%d%b%Y"), "_withLoFs_and_counts.csv")))
+  finalCatalog
+}
+
+#' Execute the complete analysis required to create version 2 or 3 of the WHO catalogue
+#' @param correct_all Logical; if TRUE, FDR correction uses all variants; if FALSE, only variants appearing as a SOLO in at least one isolate.
+#' @param LoF Logical; if TRUE, pooled LoF mutations are included as hypotheses for FDR correction.
+#' @param safe Logical; if TRUE, performs a full from-scratch conversion of variants across versions (slow).
+#' @param minMAF Minimum minor allele frequency; variants below this threshold are treated as heterozygous.
+#' @param lowMAFHet Logical; if TRUE, low-MAF variants become hets; if FALSE, they are filtered out.
+#' @param minQ Minimum quality score; variants below this threshold are treated as heterozygous.
+#' @param lowQHet Logical; if TRUE, low-quality variants become hets; if FALSE, they are filtered out.
+#' @param EXTRACTION_ID Identifier string for the database extraction (used to locate input files); defaults to the package constant EXTRACTION_ID.
+#' @param listIsolates Logical; if TRUE, records all isolates classified as solo at each iteration.
+#' @param augmentWithOrphansAndLineage Logical; if TRUE, add a breakdown by sub-lineage and the number of orphans.
+#' @param OUTPUT_DIRECTORY Directory for writing output files; defaults to Results/<EXTRACTION_ID>.
+#' @param DATA_DIRECTORY Directory containing the database extraction files.
+#' @param NON_DATABASE_DIRECTORY Directory containing non-database reference files (defaults to inst/extdata).
+#' @export
+mainDriver = function(correct_all = TRUE,
+                      LoF = TRUE,
+                      safe = TRUE,
+                      minMAF = MAF_THRESHOLD_REGULAR,
+                      lowMAFHet = TRUE,
+                      minQ = QUALITY_THRESHOLD_STRICT,
+                      lowQHet = TRUE,
+                      EXTRACTION_ID = EXTRACTION_ID,
+                      listIsolates = TRUE,
+                      augmentWithOrphansAndLineage = TRUE,
+                      OUTPUT_DIRECTORY = paste0("Results/", EXTRACTION_ID),
+                      DATA_DIRECTORY         = "SOLO Algorithm Input files/DATABASE EXTRACTION files/",
+                      NON_DATABASE_DIRECTORY = system.file("extdata", package = "SOLOport")) {
+  DATA_DIRECTORY %<>%
+    normalizePath()
+  NON_DATABASE_DIRECTORY %<>%
+    normalizePath()
+  dir.create(OUTPUT_DIRECTORY, recursive = TRUE)
+  OUTPUT_DIRECTORY %<>%
+    normalizePath()
+  ## Initial preprocessing of the genotypes: extract all the genotypes, recording the drug and the tier
+  print("Extracting the genotypes")
+  allGenotypes  = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "full_genotypes/", sep = "/"),
+                              drugList = DRUG_LIST, geno = TRUE)
+  ## Make sure there are no missing or empty resolved symbols
+  stopifnot(!any(is.na(allGenotypes$resolved_symbol)))
+  allGenotypes = preprocessGenotypes(allGenotypes, minMAF = minMAF, minQ = minQ)
+  runGenotypeConsistencyTests(allGenotypes)
+  ## Initial preprocessing of the phenotypes: extract all the phenotypes, recording the drug
+  print("Extracting the phenotypes")
+  allPhenotypes = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "phenotypes/", sep="/"),
+                              drugList = DRUG_LIST, geno = FALSE)
+  ## Rename one column for convenience and remove an unused column
+  allPhenotypes = allPhenotypes %>%
+    rename(category_phenotype = 'phenotypic_category') %>%
+    select(-"box")
+  runPhenotypeConsistencyTests(allPhenotypes)
+  ## Merge the genotypes and the phenotypes after separating the latter by phenotypic category group
+  fullDataset = mergeGenoPheno(allGenotypes, allPhenotypes, phenoGroups = PHENO_GROUPS)
+  samplesToExclude = identifySamplesToExclude(fullDataset[["MAIN"]])
+  ## Record the sample_ids that need to be excluded
+  write_csv(samplesToExclude, file.path(OUTPUT_DIRECTORY, "excluded_after_qc.csv"))
+  ## Set the data with WHO phenotype and add it to the dataset; it will be used to determine neutral variants
+  WHOData = fullDataset[["MAIN"]] %>%
+    dplyr::filter(category_phenotype == "WHO")
+  fullDataset[["WHO"]] = WHOData
+  ## Replace the phenotype in the MAIN dataset with "ALL"
+  fullDataset[["MAIN"]] %<>%
+    mutate(category_phenotype = "ALL")
+  ## (Re)run the neutral algorithm to create the files containing neutral mutations (note that this is a side effect)
+  if (safe) {
+    litTab = read_csv(file.path(str_remove(NON_DATABASE_DIRECTORY, "/$"), "literature_neutrals.csv"),
+                      show_col_types = FALSE, guess_max = LARGE_NUMBER)
+    WHODataMarked = WHOData %>%
+      dplyr::filter(!(sample_id %in% samplesToExclude$sample_id)) %>%
+      neutralAlgorithm(litTab = litTab, NON_DATABASE_DIRECTORY = str_remove(NON_DATABASE_DIRECTORY, "/$"))
+    writeNeutralOutputs(WHODataMarked, safe = safe, outDir = OUTPUT_DIRECTORY)
+  }
+  ## Extract the prepared list of all neutral mutations
+  ## TODO: Consider doing this with an in-memory variable
+  allNeutrals = read_csv(file.path(OUTPUT_DIRECTORY, "neutral_mutations_WHO_F.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
+    mutate(neutral = TRUE)
+  ## Now identify the neutral variants and mark these, as well as other relevant ones, in the entire dataset
+  fullDataset = annotateDatasets(fullDataset, samplesToExclude, allNeutrals)
+  ## Save the clean version of the input data for downstream analysis of the catalogue's performance on itself
+  write_csv(fullDataset[["MAIN"]], file.path(OUTPUT_DIRECTORY, "CompleteDataset.csv"))
+  write_csv(fullDataset[["WHO"]], file.path(OUTPUT_DIRECTORY, "CompleteDatasetWHO.csv"))
+  result      = runSOLOPipelinePerDataset(fullDataset, samplesToExclude, OUTPUT_DIRECTORY, LoF, listIsolates, correct_all)
+  fullDataset = result$fullDataset
+  stageStats  = result$stageStats
+  finalCatalog = computeFinalGrades(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all)
   write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", format(Sys.Date(), "%d%b%Y"), "_withLoFs.csv")))
   reducedGradedCatalog = finalCatalog %>%
     select(c(drug, variant, Initial_Confidence_Grading, Supplementary_Grading_Considerations,	Final_Confidence_Grading))
   write_csv(reducedGradedCatalog, file = file.path(OUTPUT_DIRECTORY, paste0("List_of_graded_variants_", format(Sys.Date(), "%d%b%Y"), ".csv")))
   ## Additional processing: orphans and lineage stratification of all isolates with the mutation present
   if (augmentWithOrphansAndLineage) {
-    orphanTab = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID, minMAF = minMAF, minQ = minQ)
-    lineageTab = getLineageData(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRUE)
-    mainTab = fullDataset[["MAIN"]]
-    fullTab = mainTab %>%
-      bind_rows(orphanTab) %>%
-      left_join(lineageTab, by = "sample_id") %>%
-      pivot_wider(names_from = lineage, values_from = lineage, values_fill = list(lineage = 0), values_fn = length)
-    colnames(fullTab)[-(1:ncol(mainTab))] = paste0("lineage_", colnames(fullTab)[-(1:ncol(mainTab))])
-    fullCounts = fullTab %>%
-      dplyr::filter(!het & !(sample_id %in% samplesToExclude$sample_id)) %>%
-      group_by(drug, variant) %>%
-      summarise(across(starts_with('lineage'), sum), 
-                count = n(), orphan_count = sum(phenotype == "U"), .groups = "drop")
-    finalCatalog = finalCatalog %>%
-      full_join(fullCounts, by = c("drug", "variant")) %>%
-      mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)}))
-    cnames = colnames(finalCatalog)
-    countNames = cnames[str_detect(cnames, "lineage_")]
-    countNames = countNames[order(str_remove(countNames, "lineage_") %>% as.numeric())]
-    cnames = c(setdiff(cnames, countNames), countNames)
-    finalCatalog = finalCatalog %>%
-      select(all_of(cnames))
-    write_csv(finalCatalog, file.path(OUTPUT_DIRECTORY, paste0("Final_graded_algorithm_catalogue_", format(Sys.Date(), "%d%b%Y"), "_withLoFs_and_counts.csv")))
+    finalCatalog = augmentWithLineageData(finalCatalog, fullDataset, samplesToExclude, DATA_DIRECTORY, EXTRACTION_ID, minMAF, minQ, OUTPUT_DIRECTORY)
   }
   fullDataset
 }
