@@ -134,7 +134,7 @@ applyGradingRules = function(inputTab, auxData) {
   ## Extract additional grading criteria from PREV_VERSION, then prepare to compute the final grades and record additional grading criteria
   ## Note that only one rule is applied per variant-drug pair; those to which a rule has been applied are marked by setting anyRule to TRUE
   inputTab = inputTab %>%
-    mutate(Final = Initial, `Additional grading criteria` = NA, Rule_Final = INITIAL_RULE_FINAL, anyRule = FALSE)
+    mutate(Final = Initial, `Additional grading criteria` = NA, Rule_Final = LAST_INITIAL_RULE, anyRule = FALSE)
   ## Upgrade to grade 4 variants initially graded 5 by set C only (i.e. literature only) or previous version guidance
   inputTab = inputTab %>%
     mutate(rule_literature       = ((setC_WHO | prev_version_WHO) & !(setA_WHO | setB_WHO | setD_WHO | setE_WHO) & Initial == 5)) %>%

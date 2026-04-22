@@ -108,8 +108,8 @@ GRADES = paste0(c("", "not "), "assoc w ") %>%
 INITIAL_FLAG     = 6
 FINAL_FLAG       = 6
 MAX_GRADE        = 6
-INITIAL_RULE_FINAL = 15L
-FIRST_RULE_NUM     = INITIAL_RULE_FINAL + 1L
+LAST_INITIAL_RULE = 15L
+FIRST_RULE_NUM    = LAST_INITIAL_RULE + 1L
 
 ## Process-specific tables
 ## PHENO_GROUPS    = tibble(category_phenotype = c("ALL", "WHO", "CC", "CC-ATU"), group = c("MAIN", "MAIN", "CC", "ATU"))
