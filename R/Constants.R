@@ -87,15 +87,14 @@ SIG_THRESHOLD         = 0.05
 FDR_THRESHOLD         = 0.05
 CI_COEFFICIENT        = 1.96
 
-MAF_THRESHOLD_STRICT  = 0.90
-MAF_THRESHOLD_REGULAR = 0.75
-MAF_THRESHOLD_RELAXED = 0.25
-MAF_THRESHOLDS     = c(strict = MAF_THRESHOLD_STRICT,     regular = MAF_THRESHOLD_REGULAR,     relaxed = MAF_THRESHOLD_RELAXED)
-QUALITY_THRESHOLDS = c(strict = QUALITY_THRESHOLD_STRICT, regular = QUALITY_THRESHOLD_REGULAR, relaxed = QUALITY_THRESHOLD_RELAXED)
-
-QUALITY_THRESHOLD_STRICT = 1000
+MAF_THRESHOLD_STRICT      = 0.90
+MAF_THRESHOLD_REGULAR     = 0.75
+MAF_THRESHOLD_RELAXED     = 0.25
+QUALITY_THRESHOLD_STRICT  = 1000
 QUALITY_THRESHOLD_REGULAR = 500
 QUALITY_THRESHOLD_RELAXED = 250
+MAF_THRESHOLDS     = c(strict = MAF_THRESHOLD_STRICT,     regular = MAF_THRESHOLD_REGULAR,     relaxed = MAF_THRESHOLD_RELAXED)
+QUALITY_THRESHOLDS = c(strict = QUALITY_THRESHOLD_STRICT, regular = QUALITY_THRESHOLD_REGULAR, relaxed = QUALITY_THRESHOLD_RELAXED)
 
 ## Grades used to prioritise variants
 GRADES = paste0(c("", "not "), "assoc w ") %>% 
@@ -106,9 +105,11 @@ GRADES = paste0(c("", "not "), "assoc w ") %>%
   enframe(value = "grading") %>%
   mutate(grading = paste0(name, ") ", grading)) %>%
   pull(grading)
-INITIAL_FLAG = 6
-FINAL_FLAG   = 6
-MAX_GRADE    = 6
+INITIAL_FLAG     = 6
+FINAL_FLAG       = 6
+MAX_GRADE        = 6
+INITIAL_RULE_FINAL = 15L
+FIRST_RULE_NUM     = INITIAL_RULE_FINAL + 1L
 
 ## Process-specific tables
 ## PHENO_GROUPS    = tibble(category_phenotype = c("ALL", "WHO", "CC", "CC-ATU"), group = c("MAIN", "MAIN", "CC", "ATU"))

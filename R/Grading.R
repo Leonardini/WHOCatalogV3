@@ -1,6 +1,36 @@
 ## TODO: fbiA_c.744C>A with PMD and DLM is changing from group 4 to group 2, confirm that this is correct!
 ## TODO: Take care of the inframe insertions and deletions and missense mutations (making sure they are listed for both) when updating!
 
+GRADING_RULE_LEDGER = tribble(
+  ~name,                  ~description,              ~grade,          ~applyAlways, ~nRules,
+  "rule_literature",      LIT_EVIDENCE,              4L,              FALSE,        1L,
+  "rule_AllOnly",         ALL_ONLY,                  2L,              FALSE,        1L,
+  "rule_WHOBased",        NA_character_,             NA_integer_,     FALSE,        1L,
+  "rule_FLAG",            MANUAL_CHECK,              NA_integer_,     FALSE,        1L,
+  "rule_rpoB_borderline", NA_character_,             1L,              TRUE,         1L,
+  "rule_silent",          SILENT,                    4L,              FALSE,        1L,
+  "rule_RRDR",            RRDR,                      2L,              FALSE,        1L,
+  "rule_LoF",             LoF_MUT,                   2L,              FALSE,        1L,
+  "cross_res",            NA_character_,             2L,              FALSE,        NUM_CROSS_RES_RULES,
+  "rule_Assay",           PROBLEMATIC_CRITERION,     2L,              FALSE,        1L,
+  "rule_Allelic",         NA_character_,             2L,              FALSE,        1L,
+  "rule_LoF_re",          LoF_MUT,                   2L,              FALSE,        1L,
+  "rule_PZA_lit",         NA_character_,             2L,              FALSE,        1L,
+  "rule_prev_guidance",   PREV_GUIDANCE,             FINAL_FLAG,      FALSE,        1L
+) %>%
+  mutate(.endRule = FIRST_RULE_NUM - 1L + cumsum(nRules))
+
+ruleEndNum = function(name) GRADING_RULE_LEDGER$.endRule[GRADING_RULE_LEDGER$name == name]
+
+applyNamedRule = function(inputTab, name, description = NULL, finalRule = NULL) {
+  row  = GRADING_RULE_LEDGER[GRADING_RULE_LEDGER$name == name, ]
+  desc = if (is.null(description)) row$description[[1]] else description
+  fr   = if (is.null(finalRule))   row$.endRule[[1]]   else finalRule
+  inputTab %>%
+    applyExpertRule(name, description = desc, finalGrade = row$grade[[1]],
+                    finalRule = fr, applyAlways = row$applyAlways[[1]])
+}
+
 #' Prepare the master variant table, carry out basic sanity checks, and compute genes and mutations
 #' @noRd
 prepareGradingInput = function(stage = NA, LoF = TRUE, outDir = ".") {
@@ -104,109 +134,94 @@ applyGradingRules = function(inputTab, auxData) {
   ## Extract additional grading criteria from PREV_VERSION, then prepare to compute the final grades and record additional grading criteria
   ## Note that only one rule is applied per variant-drug pair; those to which a rule has been applied are marked by setting anyRule to TRUE
   inputTab = inputTab %>%
-    mutate(Final = Initial, `Additional grading criteria` = NA, Rule_Final = 15, anyRule = FALSE)
-  firstRuleNum = 16
-  ruleNum = firstRuleNum
+    mutate(Final = Initial, `Additional grading criteria` = NA, Rule_Final = INITIAL_RULE_FINAL, anyRule = FALSE)
   ## Upgrade to grade 4 variants initially graded 5 by set C only (i.e. literature only) or previous version guidance
   inputTab = inputTab %>%
     mutate(rule_literature       = ((setC_WHO | prev_version_WHO) & !(setA_WHO | setB_WHO | setD_WHO | setE_WHO) & Initial == 5)) %>%
-    applyExpertRule("rule_literature", description = LIT_EVIDENCE, finalGrade = 4, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_literature")
   ## Downgrade to grade 2 variants initially graded 1 by the ALL dataset only
   inputTab = inputTab %>%
     mutate(rule_AllOnly     = (Initial_ALL == 1 & Initial_WHO == 3)) %>%
-    applyExpertRule("rule_AllOnly",  description = ALL_ONLY,  finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_AllOnly")
   ## Mark those variants which had discrepant AwR grades in the two datasets as "Based on WHO dataset"
   ## Update (FEB 7, 2026): the indicator only applies when we have grade 2 dominating grade 1, not the other way around
   tempDescription = ifelse(is.na(inputTab$Initial_WHO) | is.na(inputTab$Initial_ALL) | inputTab$Initial_WHO != inputTab$Initial_ALL, WHO_BASED, NA)
   inputTab = inputTab %>%
     ## mutate(rule_WHOBased    = (pmax(Initial_WHO, Initial_ALL) <= 2 & Initial_WHO != Initial_ALL)) %>%
     mutate(rule_WHOBased    = (Initial_WHO == 2 & Initial_ALL == 1)) %>%
-    applyExpertRule("rule_WHOBased",  description = tempDescription, finalGrade = NA, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_WHOBased", description = tempDescription)
   ## Mark those variants which triggered a flag at the initial classification as "Manual check required"
   inputTab = inputTab %>%
     mutate(rule_FLAG        = (Initial == INITIAL_FLAG)) %>%
-    applyExpertRule("rule_FLAG",      description = MANUAL_CHECK, finalGrade = NA, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_FLAG")
   ## Upgrade rpoB borderline mutations to grade 1; note: this rule overrides any previously applied rules!
   tempDescription = ifelse(is.na(inputTab$Final) | inputTab$Final > 1, BORDERLINE, NA)
   inputTab = inputTab %>%
     mutate(rule_rpoB_borderline = (gene == RRDR_GENE & mutation %in% BORDERLINE_MUTATIONS)) %>%
-    applyExpertRule("rule_rpoB_borderline", description = tempDescription, finalGrade = 1, finalRule = ruleNum, applyAlways = TRUE)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_rpoB_borderline", description = tempDescription)
   ## Downgrade any silent variant to grade 4, then set to NA their SOLO counts and related statistics!
   inputTab = inputTab %>%
     mutate(rule_silent = (effect_ALL %in% SILENT_EFFECTS                                                                    & Initial == 3)) %>%
-    applyExpertRule("rule_silent",          description = SILENT,   finalGrade = 4, finalRule = ruleNum) %>%
-    mutate_at(str_subset(colnames(.), "SOLO"), ~{ifelse(Rule_Final == ruleNum, NA, .)})
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_silent") %>%
+    mutate_at(str_subset(colnames(.), "SOLO"), ~{ifelse(Rule_Final == ruleEndNum("rule_silent"), NA, .)})
   ## Upgrade any non-silent variant in the RRDR region to grade 2
   inputTab = inputTab %>%
     mutate(rule_RRDR = (gene == RRDR_GENE & (pos1_ALL %in% RRDR_INT | pos2_ALL %in% RRDR_INT) & !effect_ALL %in% SILENT_EFFECTS & Initial == 3)) %>%
-    applyExpertRule("rule_RRDR",            description = RRDR,    finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_RRDR")
   ## If a pooled LoF is graded 1 or 2, then any grade 3 LoF mutation in the same drug-gene combination is upgraded to grade 2
   inputTab = inputTab %>%
     group_by(gene, drug) %>%
     mutate(rule_LoF_candidate = (any(mutation == "LoF" & Final <= 2))) %>%
     ungroup() %>%
     mutate(rule_LoF = (rule_LoF_candidate & mutation != "LoF" & effect_ALL %in% POOLED_EFFECTS[["LoF"]]                     & Initial == 3)) %>%
-    applyExpertRule("rule_LoF",             description = LoF_MUT, finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
-  initRuleCrossRes = ruleNum
+    applyNamedRule("rule_LoF")
+  initRuleCrossRes = ruleEndNum("cross_res") - NUM_CROSS_RES_RULES + 1L
   ## Apply the cross-resistance rules the first time around
   inputTab = inputTab %>%
     applyCrossResistanceRules(iteration = 1, initRule = initRuleCrossRes)
-  ruleNum = initRuleCrossRes + NUM_CROSS_RES_RULES
   ## Upgrade to grade 2 any variant that is "recognized as DR marker" in a WHO-endorsed assay, as well as any variant with allelic exchange evidence
   assayTab = auxData$assayTab
   inputTab = inputTab %>%
     full_join(assayTab, by = c("drug", "variant")) %>%
     mutate(assay = convertToLogical(assay),   anyRule = convertToLogical(anyRule), rule_Assay = (assay & (is.na(Initial) | Initial == 3))) %>%
-    applyExpertRule("rule_Assay",     description = PROBLEMATIC_CRITERION, finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_Assay")
   allelicTab = auxData$allelicTab
   inputTab = inputTab %>%
     full_join(allelicTab, by = c("drug", "variant")) %>%
     mutate(allelic = convertToLogical(allelic), anyRule = convertToLogical(anyRule), rule_Allelic = (allelic & (is.na(Initial) | Initial == 3)))
   tempDescription = ifelse(is.na(inputTab$Final) | inputTab$Final > 2, ALLELIC_EXP, NA)
   inputTab = inputTab %>%
-    applyExpertRule("rule_Allelic", description = tempDescription, finalGrade = 2, finalRule = ruleNum) %>%
+    applyNamedRule("rule_Allelic", description = tempDescription) %>%
     select(-assay, -allelic)
-  ruleNum = ruleNum + 1
-  ## If any of the rules after the cross-resistance one has upgraded a pooled LOF variant to grade 2, we apply it one more time to the corresponding variants 
+  ## If any of the rules after the cross-resistance one has upgraded a pooled LOF variant to grade 2, we apply it one more time to the corresponding variants
   inputTab = inputTab %>%
     group_by(gene, drug) %>%
     mutate(rule_LoF_re_candidate = any(mutation == "LoF" & Final <= 2 & Rule_Final >= initRuleCrossRes)) %>%
     ungroup() %>%
     mutate(rule_LoF_re = (rule_LoF_re_candidate & mutation != "LoF" & effect_ALL %in% POOLED_EFFECTS[["LoF"]]              & Initial == 3)) %>%
-    applyExpertRule("rule_LoF_re",    description = LoF_MUT,               finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_LoF_re")
   ## Apply the cross-resistance rules the second time around
   inputTab = inputTab %>%
     applyCrossResistanceRules(iteration = 2, initRule = initRuleCrossRes)
-  ## Upgrade a specific variant to grade 2 based on Literature evidence (PMID 32571824) 
+  ## Upgrade a specific variant to grade 2 based on Literature evidence (PMID 32571824)
   inputTab = inputTab %>%
     mutate(rule_PZA_lit = (variant == PZA_SPEC_VAR                                                                         & Initial == 3)) %>%
-    applyExpertRule("rule_PZA_lit",      description = describePMIDs(32571824), finalGrade = 2, finalRule = ruleNum)
-  ruleNum = ruleNum + 1
+    applyNamedRule("rule_PZA_lit", description = describePMIDs(32571824))
+  prevGuidanceRule = ruleEndNum("rule_prev_guidance")
   if (!any(inputTab$variant == DCS_SPEC_VAR)) {
     inputTab = inputTab %>%
-      bind_rows(tibble(drug = "Cycloserine", variant = DCS_SPEC_VAR, anyRule = FALSE, Initial = 3, Final = 2, Rule_Final = ruleNum, 
+      bind_rows(tibble(drug = "Cycloserine", variant = DCS_SPEC_VAR, anyRule = FALSE, Initial = 3, Final = 2, Rule_Final = prevGuidanceRule,
                        `Additional grading criteria` = describePMIDs(c(22912881, 27064254))))
   }
   ## Upgrade to grade 2 based on previous guidance to distinguish between "evidence in version 2" and "guidance before version 2" (e.g. Miotto ERJ2017)
   inputTab = inputTab %>%
     mutate(rule_prev_guidance = (!is.na(`Additional grading criteria`) & `Additional grading criteria` %in% PREV_GUIDANCE   & Initial == 3)) %>%
-    applyExpertRule("rule_prev_guidance", description = PREV_GUIDANCE, finalGrade = FINAL_FLAG, finalRule = ruleNum)
+    applyNamedRule("rule_prev_guidance")
   extraTab = auxData$extraTab
   inputTab = inputTab %>%
     left_join(extraTab, by = c("drug", "variant")) %>%
     mutate(rule_prev_evidence = (!is.na(Final_prev_version) & Final_prev_version < 3 & (!effect_ALL %in% INFRAME_EFFECTS) & Initial == 3)) %>%
-    applyExpertRule("rule_prev_evidence", description = PREV_EVIDENCE, finalGrade = FINAL_FLAG, finalRule = ruleNum + 1/2)
-  ruleNum = ruleNum + 1
+    applyExpertRule("rule_prev_evidence", description = PREV_EVIDENCE, finalGrade = FINAL_FLAG, finalRule = prevGuidanceRule + 0.5)
   ## Add comment column to a specified list of mutations or mutation categories, provided they were initially graded 3 and no other rule has applied:
   commentCategoryTab = auxData$commentCategoryTab
   commentLoF         = auxData$commentLoF
@@ -221,10 +236,10 @@ applyGradingRules = function(inputTab, auxData) {
     dplyr::filter(!is.na(variant))
   ## Specify PMIDs that lead to a downgrade by the first 'proper' rule:
   inputTab = inputTab %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug == "Bedaquiline"      & Rule_Final == firstRuleNum, describePMIDs(c(28031270, 34503982)), .)}) %>% 
-    mutate_at("Additional grading criteria", ~{ifelse(drug %in% LEV_MXF          & Rule_Final == firstRuleNum, describePMIDs(28137812),              .)}) %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug %in% FIRST_LINE_DRUGS & Rule_Final == firstRuleNum, describePMIDs(32143680),           .)}) %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug == "Cycloserine"      & Rule_Final == firstRuleNum, describePMIDs(c(27064254, 28971867)), .)})
+    mutate_at("Additional grading criteria", ~{ifelse(drug == "Bedaquiline"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(28031270, 34503982)), .)}) %>%
+    mutate_at("Additional grading criteria", ~{ifelse(drug %in% LEV_MXF          & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(28137812),              .)}) %>%
+    mutate_at("Additional grading criteria", ~{ifelse(drug %in% FIRST_LINE_DRUGS & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(32143680),           .)}) %>%
+    mutate_at("Additional grading criteria", ~{ifelse(drug == "Cycloserine"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(27064254, 28971867)), .)})
   ## Remove variant addition variables
   inputTab = inputTab %>%
     select(-starts_with("add_"))
