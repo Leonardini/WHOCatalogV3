@@ -760,3 +760,24 @@ applyCrossResistanceRules = function(inputTab, iteration = 1, initRule = 0) {
     ungroup()
   inputTab
 }
+
+
+## ---------------------------------------------------------------------------
+## Legacy code from SensSpec.R / computeSensSpec (removed during D-section cleanup)
+
+## Alternative epistasis exclusion: mark epistasis candidates as het before
+## computing group min (requires excludeEpi_Regular/Relaxed computed in
+## computeEpistasisStats; disabled pending full v3 epistasis implementation)
+# if (version == CURR_VERSION) {
+#   fullDataset = fullDataset %>%
+#     mutate_at("het",         ~{ifelse(excludeEpi_Regular, TRUE, .)}) %>%
+#     mutate_at("het_relaxed", ~{ifelse(excludeEpi_Relaxed, TRUE, .)})
+# }
+
+## Alternative extendedCandidate logic based on ADDITIONAL_EFFECTS / ADDITIONAL_GENES
+## (replaced by the katG-specific INH version active in computeSensSpec)
+# fullDataset = fullDataset %>%
+#   mutate(extendedCandidate = (effect %in% ADDITIONAL_EFFECTS & (gene %in% unlist(ADDITIONAL_GENES[-1]) | (drug_short == "DLM" & gene %in% EXTENDED_ADD_GENES[["DLM"]])))) %>%
+#   mutate_at("Group_Regular", ~{ifelse(RIF_geno_Regular & any(!het         & Final == 3 & extendedCandidate & . == 4), 3, .)}) %>%
+#   mutate_at("Group_Relaxed", ~{ifelse(RIF_geno_Relaxed & any(!het_relaxed & Final == 3 & extendedCandidate & . == 4), 3, .)}) %>%
+#   select(-extendedCandidate)

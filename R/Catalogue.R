@@ -82,7 +82,7 @@ applyThresholds = function(inputData, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet 
         dplyr::filter(is.na(`max(af)`) | `max(af)` >= minMAF)
     }
   } else {
-    print('Warning: no max(af) column found in input data; skipping MAF filtering.')
+    warning('no max(af) column found in input data; skipping MAF filtering.')
   }
   if ('max(quality)' %in% colnames(inputData) && !is.na(minQ)) {
     if (lowQHet) {
@@ -93,7 +93,7 @@ applyThresholds = function(inputData, minMAF = MAF_THRESHOLD_REGULAR, lowMAFHet 
         dplyr::filter(is.na(`max(quality)`) | `max(quality)` >= minQ)
     }
   } else {
-    print('Warning: no max(quality) column found in input data; skipping quality filtering.')
+    warning('no max(quality) column found in input data; skipping quality filtering.')
   }
   return(inputData)
 }

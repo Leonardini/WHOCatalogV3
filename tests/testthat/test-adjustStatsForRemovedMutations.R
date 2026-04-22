@@ -103,8 +103,7 @@ test_that("adjustStatsForRemovedMutations prints a message", {
   stats   <- make_cur_stats()
   dataset <- make_cur_dataset()
   remove  <- tibble(drug = "Isoniazid", variant = "katG_p.Ser315Thr")
-  expect_output(
-    adjustStatsForRemovedMutations(stats, dataset, remove, 2L, make_empty_solos()),
-    "Removing"
+  expect_snapshot(
+    adjustStatsForRemovedMutations(stats, dataset, remove, 2L, make_empty_solos())
   )
 })

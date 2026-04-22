@@ -140,7 +140,7 @@ computeSensSpec = function(fullDataset,
                            skipCompensatory = TRUE,
                            saveIntermed = FALSE) {
   processedDatasets = imap(MAF_THRESHOLDS, function(threshold, curName) {
-    print(paste("Processing option", curName))
+    message(paste("Processing option", curName))
     fullDataset %>%
       applyCatalogue(catalogueFile, minMAF = threshold, minQ = QUALITY_THRESHOLD_STRICT, LoF = TRUE, version = version)
   })
@@ -188,11 +188,6 @@ computeSensSpec = function(fullDataset,
   }
   ## Assign the final "regular" and "relaxed" groups to each sample; NB: samples flagged for epistasis will be counted as not fitting the catalogue criteria
   ## The computation below adds MAX_GRADE to any het variant so that any group of interest (1, 2 or 3) can only get determined by relevant non-hets
-  # if (version == CURR_VERSION) { ## NOTE: mark epistasis candidates as MAX_GRADE first, then take min
-  #   fullDataset = fullDataset %>%
-  #     mutate_at("het", ~{ifelse(excludeEpi_Regular, TRUE, .)}) %>%
-  #     mutate_at("het_relaxed", ~{ifelse(excludeEpi_Relaxed, TRUE, .)})
-  # }
   fullDataset = fullDataset %>%
     mutate(Group_Regular = min(Final + het * MAX_GRADE), Group_Relaxed = min(Final_Relaxed + het_relaxed * MAX_GRADE)) %>%
     mutate_at(c("Group_Regular", "Group_Relaxed"), ~{ifelse(. >= 3, . + 1, .)}) %>%
@@ -200,10 +195,6 @@ computeSensSpec = function(fullDataset,
     mutate_at("Group_Regular", ~{ifelse(any(variant %in% COMPENSATORY) & any((!het)         & extendedCandidate & . == 4), 3, .)}) %>%
     mutate_at("Group_Relaxed", ~{ifelse(any(variant %in% COMPENSATORY) & any((!het_relaxed) & extendedCandidate & . == 4), 3, .)}) %>%
     select(-extendedCandidate)
-    # mutate(extendedCandidate = (effect %in% ADDITIONAL_EFFECTS & (gene %in% unlist(ADDITIONAL_GENES[-1]) | (drug_short == "DLM" & gene %in% EXTENDED_ADD_GENES[["DLM"]])))) %>%
-    # mutate_at("Group_Regular", ~{ifelse(RIF_geno_Regular & any(!het         & Final == 3 & extendedCandidate & . == 4), 3, .)}) %>%
-    # mutate_at("Group_Relaxed", ~{ifelse(RIF_geno_Relaxed & any(!het_relaxed & Final == 3 & extendedCandidate & . == 4), 3, .)}) %>%
-    # select(-extendedCandidate)
   if (safe) { 
     stopifnot(all(testConsistent(fullDataset, groupingVars = c("sample_id", "drug"), consistentVars = c("Group_Regular", "Group_Relaxed"))[[1]])) 
     if (useLineageData) {

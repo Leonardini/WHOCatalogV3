@@ -29,7 +29,7 @@ identifySamplesToExclude = function(mainDataset) {
 annotateDatasets = function(fullDataset, samplesToExclude, allNeutrals) {
   for (name in names(fullDataset)) {
     if (name %in% c("MAIN", "WHO")) {
-      print(paste("Preprocessing the", name, "dataset"))
+      message(paste("Preprocessing the", name, "dataset"))
       curSet = fullDataset[[name]]
       ## Compute the per-drug denominators (number of R/S isolates screened for each drug); account for exclusion
       allDenominators = curSet %>%
@@ -129,7 +129,7 @@ adjustStatsForRemovedMutations = function(curStats, curDataset, mutationsToRemov
     inner_join(mutationsToRemove, by = c("drug", "variant")) %>%
     pull(sample_id) %>%
     unique()
-  print(paste("Removing", length(extraIsolates), "isolates at stage", curStage))
+  message(paste("Removing", length(extraIsolates), "isolates at stage", curStage))
   extraDenominators = curDataset %>% ## TODO: Make sure that we only need to subtract non-het non-missing counts!
     dplyr::filter(stage == curStage & sample_id %in% extraIsolates & !het & variant != "missing") %>%
     group_by(drug, variant) %>%
@@ -169,7 +169,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
     stopifnot(anyDuplicated(fullDataset[[name]] %>% dplyr::filter(variant != "missing") %>% select(drug, sample_id, variant)) == 0)
     for (pool in c(NA, names(POOLED_EFFECTS))) {
       POOLED = !is.na(pool)
-      print(paste("Processing the combination of", name, "and", ifelse(POOLED, pool, "no"), "pooling"))
+      message(paste("Processing the combination of", name, "and", ifelse(POOLED, pool, "no"), "pooling"))
       ## Extract the dataset corresponding to the name
       curSet = fullDataset[[name]]
       excluded       = computeExcludedCounts(curSet, samplesToExclude, name)
@@ -193,7 +193,7 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
       }
       curSet = markStages(curSet)
       for (stage in 1:ifelse(POOLED, 2, 3)) { ## NOTE: stage 0 is removed as it only counts the neutral variants
-        print(paste("Processing stage", stage))
+        message(paste("Processing stage", stage))
         if (stage == 1) {
           ## Prepare stage 1: mask all neutral, silent and tier 2 variants
           relevantSet = prepMask(curSet, Silent = TRUE,  Tier2 = TRUE,  Neutral = TRUE,  Pool = pool, SOnly = TRUE)
@@ -257,12 +257,12 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
 #' Grade mutations stage by stage and assemble the final catalogue
 #' @noRd
 computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all) {
-  print("Computing the final grades of all mutations")
+  message("Computing the final grades of all mutations")
   stopifnot(length(POOLED_EFFECTS) == 1) ## Ensure that there is exactly one pool, as otherwise the simplified logic below breaks!
   ## CHANGE ON SEPT 11, 2025: the grading is now stage-wise and samples with grade 1/2 mutations are ignored in subsequent stages!
   gradedCatalog = NULL
   for (curStage in 1:3) {
-    print(paste("Currently processing stage", curStage))
+    message(paste("Currently processing stage", curStage))
     if (curStage > 1) {
       mutationsToRemove = gradedCatalog %>%
         dplyr::filter(Final %in% GRADES[1:2] & stage < curStage) %>%
@@ -382,7 +382,7 @@ mainDriver = function(correct_all = TRUE,
   OUTPUT_DIRECTORY %<>%
     normalizePath()
   ## Initial preprocessing of the genotypes: extract all the genotypes, recording the drug and the tier
-  print("Extracting the genotypes")
+  message("Extracting the genotypes")
   allGenotypes  = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "full_genotypes/", sep = "/"),
                               drugList = DRUG_LIST, geno = TRUE)
   ## Make sure there are no missing or empty resolved symbols
@@ -390,7 +390,7 @@ mainDriver = function(correct_all = TRUE,
   allGenotypes = preprocessGenotypes(allGenotypes, minMAF = minMAF, minQ = minQ)
   runGenotypeConsistencyTests(allGenotypes)
   ## Initial preprocessing of the phenotypes: extract all the phenotypes, recording the drug
-  print("Extracting the phenotypes")
+  message("Extracting the phenotypes")
   allPhenotypes = extractData(inDir = paste(str_remove(DATA_DIRECTORY, "/$"), str_remove(EXTRACTION_ID, "/$"), "phenotypes/", sep="/"),
                               drugList = DRUG_LIST, geno = FALSE)
   ## Rename one column for convenience and remove an unused column

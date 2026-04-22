@@ -16,7 +16,7 @@ extractData = function(inDir, drugList = NULL, geno = FALSE) {
   outputTab = tibble()
   ## Iterate over drugs
   for (index in 1:N) {
-    print(useDirs[[index]])
+    message(useDirs[[index]])
     drugDir = file.path(inDir, useDirs[[index]])
     if (geno) {
       ## For genotypes, list the tiers
@@ -162,7 +162,7 @@ adjustDuplicateColumns = function(initTab, suffixes = c(".x", ".y"), warn = TRUE
     vec2 = initTab %>%
       pull(all_of(paste0(Col, suffixes[2])))
     if (warn && any(vec1 != vec2, na.rm = TRUE)) {
-      print(paste("Warning: column", Col, "has", sum(vec1 != vec2, na.rm = TRUE), "conflicting entries!"))
+      warning(paste("column", Col, "has", sum(vec1 != vec2, na.rm = TRUE), "conflicting entries!"))
     }
     if (add) {
       if (is.numeric(vec1) && is.numeric(vec2)) {

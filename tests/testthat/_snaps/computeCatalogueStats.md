@@ -2,8 +2,9 @@
 
     Code
       computeCatalogueStats(make_stats_df())
+    Message
+      There are 1 rows to process
     Output
-      [1] "There are 1 rows to process"
       # A tibble: 1 x 51
         drug  variant present_R present_S absent_R absent_S SOLO_R SOLO_S correctAll
         <chr> <chr>       <int>     <int>    <int>    <int>  <int>  <int> <lgl>     

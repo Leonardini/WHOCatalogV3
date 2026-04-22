@@ -36,13 +36,13 @@ computeCatalogueStats = function(TabT, correct_all = TRUE) {
   badRows = TabT %>%
     dplyr::filter(checkSum == 0)
   if (nrow(badRows) > 0) {
-    print(paste("The", nrow(badRows), "problematic variants are listed below"))
+    message(paste("The", nrow(badRows), "problematic variants are listed below"))
     print(badRows)
   }
   TabT %<>%
     dplyr::filter(checkSum > 0) %>%
     select(-checkSum)
-  print(paste("There are", nrow(TabT), "rows to process"))
+  message(paste("There are", nrow(TabT), "rows to process"))
   PPVTab       = binomLookup(TabT, "present_R", "present_S", "PPV")
   PPV_SOLOTab  = binomLookup(TabT, "SOLO_R",    "SOLO_S",    "PPV_SOLO")
   PPVc_SOLOTab = binomLookup(TabT, "SOLO_R",    "present_S", "PPVc_SOLO")

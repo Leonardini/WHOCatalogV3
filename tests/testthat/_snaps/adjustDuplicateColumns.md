@@ -2,8 +2,10 @@
 
     Code
       adjustDuplicateColumns(df, warn = TRUE)
+    Condition
+      Warning in `adjustDuplicateColumns()`:
+      column col has 1 conflicting entries!
     Output
-      [1] "Warning: column col has 1 conflicting entries!"
       # A tibble: 2 x 1
           col
         <dbl>

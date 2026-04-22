@@ -2,9 +2,12 @@
 
     Code
       applyThresholds(df, minMAF = 0.75, minQ = NA)
+    Condition
+      Warning in `applyThresholds()`:
+      no max(af) column found in input data; skipping MAF filtering.
+      Warning in `applyThresholds()`:
+      no max(quality) column found in input data; skipping quality filtering.
     Output
-      [1] "Warning: no max(af) column found in input data; skipping MAF filtering."
-      [1] "Warning: no max(quality) column found in input data; skipping quality filtering."
       # A tibble: 2 x 1
         variant
         <chr>  
@@ -15,9 +18,12 @@
 
     Code
       applyThresholds(df, minMAF = NA, minQ = 1000)
+    Condition
+      Warning in `applyThresholds()`:
+      no max(af) column found in input data; skipping MAF filtering.
+      Warning in `applyThresholds()`:
+      no max(quality) column found in input data; skipping quality filtering.
     Output
-      [1] "Warning: no max(af) column found in input data; skipping MAF filtering."
-      [1] "Warning: no max(quality) column found in input data; skipping quality filtering."
       # A tibble: 2 x 2
         `max(af)` variant
             <dbl> <chr>  
