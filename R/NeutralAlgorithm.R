@@ -17,7 +17,7 @@ neutralAlgorithm = function(masterTab, litTab,
       ## Computing the rows to be marked with rm = TRUE (Final <= 2); also converting rm to a logical variable (meaning NA -> FALSE)
       masterTab = masterTab %>%
         mutate(rm = (Final <= 2L)) %>%
-        mutate_at("rm", convertToLogical)
+        mutate(rm = convertToLogical(rm))
       # Variants in some selected tier 1 genes that have an LoF mutation are also RMs
       masterTab %<>%
         mutate(rm = or(rm, paste0(drug, gene, sep = "_") %in% paste0(NEW_PAIRS_RM$drug, NEW_PAIRS_RM$gene, sep = "_") 

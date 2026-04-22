@@ -155,7 +155,7 @@ CROSS_RES = bind_rows(tibble(description = "Fluoroquinolones", drug1 = LEV_MXF[1
                       tibble(description = "INH-ETO",          drug1 = INH_ETO[1], drug2 = INH_ETO[2], genes = list(INH_ETO_GENE)),
                       tibble(description = "BDQ-CFZ",          drug1 = BDQ_CFZ[1], drug2 = BDQ_CFZ[2], genes = list(BDQ_CFZ_GENE)),
                       tibble(description = "DLM-PMD",          drug1 = DLM_PMD[1], drug2 = DLM_PMD[2], genes = list(DLM_PMD_GENE))) %>%
-  mutate_at("description", ~{make_Evidence(spellOut(paste(., "cross-resistance")))})
+  mutate(description = make_Evidence(spellOut(paste(description, "cross-resistance"))))
 
 ## Constants used for SOLO algorithm results
 MAX_ITER = Inf

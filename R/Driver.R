@@ -6,7 +6,7 @@ preprocessGenotypes = function(allGenotypes, minMAF = MAF_THRESHOLD_REGULAR, low
     rename(gene = 'resolved_symbol', mutation = 'variant_category', effect = 'predicted_effect') %>%
     select(-neutral) %>%
     ## Replace missing mutations or effects by "missing", then create a variant out of gene and mutation
-    mutate_at(c("mutation", "effect"), ~{replace_na(., "missing")}) %>%
+    mutate(across(c(mutation, effect), ~replace_na(., "missing"))) %>%
     mutate(variant = ifelse(mutation == "missing", "missing", paste(gene, mutation, sep = "_"))) %>%
     ## Mark any genotype entry with a low MAF or a missing variant (i.e. a sequencing defect in the gene) as a het
     applyVariantPostprocessing(minMAF = minMAF, lowMAFHet = lowMAFHet, minQ = minQ, lowQHet = lowQHet)
@@ -184,11 +184,11 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
         ## Create an additional pooled variant for all the RRDR_NON_SILENT mutations
         ## Consider all the variants in the pool to have a LoF effect
         curSet %<>%
-          mutate_at("variant", ~{ ifelse(effect %in% POOLED_EFFECTS[[pool]] & !het, paste0(gene, "_", pool), .) }) %>%
-          mutate_at("variant", ~{ ifelse(RRDR_NON_SILENT & !het, paste0("RRDR", "_", pool), .)}) %>%
-          mutate_at(c("max(af)", "position", "max(quality)"), ~{ ifelse(str_ends(variant, pool), NA, .) }) %>%
-          mutate_at("neutral", ~{ ifelse(str_ends(variant, pool), FALSE, .) }) %>%
-          mutate_at("effect",  ~{ ifelse(str_ends(variant, pool), "LoF", .) }) %>%
+          mutate(variant  = ifelse(effect %in% POOLED_EFFECTS[[pool]] & !het, paste0(gene, "_", pool), variant)) %>%
+          mutate(variant  = ifelse(RRDR_NON_SILENT & !het, paste0("RRDR", "_", pool), variant)) %>%
+          mutate(across(all_of(c("max(af)", "position", "max(quality)")), ~ifelse(str_ends(variant, pool), NA, .))) %>%
+          mutate(neutral  = ifelse(str_ends(variant, pool), FALSE, neutral)) %>%
+          mutate(effect   = ifelse(str_ends(variant, pool), "LoF", effect)) %>%
           distinct(drug, sample_id, gene, variant, .keep_all = TRUE)
       }
       curSet = markStages(curSet)
@@ -258,7 +258,6 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
 #' @noRd
 computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all) {
   message("Computing the final grades of all mutations")
-  stopifnot(length(POOLED_EFFECTS) == 1) ## Ensure that there is exactly one pool, as otherwise the simplified logic below breaks!
   ## CHANGE ON SEPT 11, 2025: the grading is now stage-wise and samples with grade 1/2 mutations are ignored in subsequent stages!
   gradedCatalog = NULL
   for (curStage in 1:3) {
@@ -309,7 +308,7 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
   manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
     select(drug, variant, Supplementary_Grading_Considerations, Final_Confidence_Grading) %>%
-    mutate_at("Supplementary_Grading_Considerations", ~{str_replace(., "Additional grading evidence", "Evidence")})
+    mutate(Supplementary_Grading_Considerations = str_replace(Supplementary_Grading_Considerations, "Additional grading evidence", "Evidence"))
   applyManualChecks(finalCatalog, manual_check_results)
 }
 
@@ -464,7 +463,7 @@ getLineageData = function(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRU
   lineageData = computeDominantLineage(lineageRaw, mafThresholds = MAF_THRESHOLD_REGULAR, subLineage = useSublineageData)[[paste0("maf", MAF_THRESHOLD_REGULAR)]] %>%
     select(sample_id, dominant_lineage) %>%
     rename(lineage = dominant_lineage) %>%
-    mutate_at("lineage", ~{ifelse(!(str_sub(., 1, 1) %in% as.character(1:6)), "Other", .)})
+    mutate(lineage = ifelse(!(str_sub(lineage, 1, 1) %in% as.character(1:6)), "Other", lineage))
   lineageData
 }
 

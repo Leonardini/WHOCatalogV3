@@ -55,7 +55,7 @@ mergeGenoPheno = function(Genotypes, Phenotypes, phenoGroups = NULL) {
   Phenotypes %<>%
     inner_join(PHENO_GROUPS, by = "category_phenotype")
   fullDataset = right_join(Genotypes, Phenotypes, by = c("sample_id", "drug"), relationship = "many-to-many") %>%
-    mutate_at("het", ~{ ifelse(is.na(variant), TRUE, .) })
+    mutate(het = ifelse(is.na(variant), TRUE, het))
   fullDataset %<>%
     split(fullDataset$group)
   fullDataset

@@ -49,10 +49,10 @@ prepareGradingInput = function(stage = NA, LoF = TRUE, outDir = ".") {
 loadGradingAuxData = function(dir) {
   dir = str_remove(dir, "/$")
   assayTab = read_csv(paste0(dir, "/assay_mutations.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
-    mutate_at("drug", ~{DRUG_LIST[match(., SHORT_NAMES)]}) %>%
+    mutate(drug = DRUG_LIST[match(drug, SHORT_NAMES)]) %>%
     mutate(assay = TRUE)
   allelicTab = read_csv(paste0(dir, "/allelic_exchanges.csv"), show_col_types = FALSE, guess_max = LARGE_NUMBER) %>%
-    mutate_at("variant", ~{str_replace(., "lof$", "LoF")}) %>%
+    mutate(variant = str_replace(variant, "lof$", "LoF")) %>%
     mutate(allelic = TRUE)
   extraTab = read_csv(paste0(dir, "/v", PREV_VERSION, "_grades.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
     mutate(Final_prev_version = match(final_grading_prev_version, GRADES))
@@ -61,7 +61,7 @@ loadGradingAuxData = function(dir) {
     select(1:4) %>%
     set_colnames(c("drug", "gene", "mutation", "comment")) %>%
     mutate(temp = match(mutation, c("any AwR", "any AwRI", "any Uncertain", "any nAwRI", "any nAwR"))) %>%
-    mutate_at("mutation", ~{ifelse(!is.na(temp), temp, .)}) %>%
+    mutate(mutation = ifelse(!is.na(temp), temp, mutation)) %>%
     select(-temp)
   list(
     assayTab           = assayTab,
@@ -107,33 +107,33 @@ applyGradingRules = function(inputTab, auxData) {
     mutate(Initial            = ifelse(!is.na(neutral) & neutral, 5, 3)) %>% ## ADDED "& neutral" to the line below - October 10,2024
     mutate(Rule_Initial       = ifelse(!is.na(neutral) & neutral, ifelse(datasets == "WHO", 1, 6), ifelse(datasets == "WHO", 5, 9))) %>%
     mutate(rule_initial_up    = (SOLO_SorR >= 5        & !is.na(PPVc_SOLO_lb) & PPVc_SOLO_lb >= 0.25 & OR_SOLO > 1        & OR_SOLO_pval_FDR_sig)) %>%
-    mutate_at("Initial",      ~{ifelse(rule_initial_up, 1, .)}) %>%
-    mutate_at("Rule_Initial", ~{ifelse(rule_initial_up, ifelse(datasets == "WHO", 2, 7), .)}) %>%
+    mutate(Initial      = ifelse(rule_initial_up, 1, Initial)) %>%
+    mutate(Rule_Initial = ifelse(rule_initial_up, ifelse(datasets == "WHO", 2, 7), Rule_Initial)) %>%
     mutate(rule_pncA_down     = (gene == PZA_GENE  & !is.na(PPV_SOLO)     & PPV_SOLO < 0.4       & PPV_SOLO_ub < 0.75 & datasets == "WHO" & stage == 1)) %>%
-    mutate_at("Rule_Initial", ~{ifelse(rule_pncA_down, 3, .)}) %>%
+    mutate(Rule_Initial = ifelse(rule_pncA_down, 3, Rule_Initial)) %>%
     mutate(rule_pncA_up       = (gene == PZA_GENE  & SOLO_R >= 2          & PPVc_SOLO >= 0.5 & stage == 1)) %>% ## Used to be PPV
     ## NOTE: mutation != "LoF" was intentionally removed from the rule below
     mutate(rule_newGenes_up   = (paste(drug, gene, sep = "_") %in% paste(NEW_PAIRS$drug, NEW_PAIRS$gene, sep = "_") & SOLO_R >= 2 & PPVc_SOLO >= 0.5 & stage == 1)) %>%
-    mutate_at("Initial",      ~{ifelse(rule_pncA_down & Initial == 3, 4, ifelse((rule_pncA_up | rule_newGenes_up) & Initial == 3, 2, .))}) %>%
-    mutate_at("Rule_Initial", ~{ifelse(rule_pncA_up | rule_newGenes_up, ifelse(datasets == "WHO", 4, 8), .)}) 
+    mutate(Initial      = ifelse(rule_pncA_down & Initial == 3, 4, ifelse((rule_pncA_up | rule_newGenes_up) & Initial == 3, 2, Initial))) %>%
+    mutate(Rule_Initial = ifelse(rule_pncA_up | rule_newGenes_up, ifelse(datasets == "WHO", 4, 8), Rule_Initial)) 
   ## Reconcile initial confidence grading between the WHO and the ALL datasets by first separating them once again
   Tab0 = inputTab %>%
     dplyr::filter(datasets == "WHO")
   inputTab = inputTab %>%
     dplyr::filter(datasets == "ALL") %>%
     full_join(Tab0, by = c("variant", "drug", "gene", "mutation", "neutral", "stage"), suffix = c("_ALL", "_WHO")) %>%
-    mutate_at("Initial_WHO", ~{ifelse(is.na(.), 3, .)}) ## Not all variants are initially WHO-graded!
+    mutate(Initial_WHO = replace_na(Initial_WHO, 3)) ## Not all variants are initially WHO-graded!
   inputTab = inputTab %>%
     mutate(    Initial    = ifelse(Initial_WHO == Initial_ALL         , Initial_WHO , NA)) %>%
     mutate(    datasets   = ifelse(Initial_WHO == Initial_ALL         , ifelse(!is.na(neutral) & neutral, "WHO", "ALL+WHO"), NA)) %>%
-    mutate_at("Initial" , ~{ifelse(Initial_WHO == 3 & Initial_ALL != 3, Initial_ALL , .)}) %>%
-    mutate_at("datasets", ~{ifelse(Initial_WHO == 3 & Initial_ALL != 3, "ALL"       , .)}) %>%
-    mutate_at("Initial" , ~{ifelse( is.na(Initial_ALL) | (Initial_ALL == 3 & Initial_WHO != 3),             Initial_WHO , .)}) %>%
-    mutate_at("datasets", ~{ifelse( is.na(Initial_ALL) | (Initial_ALL == 3 & Initial_WHO != 3),             "WHO"       , .)}) %>%
-    mutate_at("Initial" , ~{ifelse( pmax(Initial_WHO, Initial_ALL) <= 2 & Initial_WHO != Initial_ALL,       Initial_WHO , .)}) %>%
-    mutate_at("datasets", ~{ifelse( pmax(Initial_WHO, Initial_ALL) <= 2 & Initial_WHO != Initial_ALL,       "WHO"       , .)}) %>%
-    mutate_at("Initial" , ~{ifelse( Initial_WHO == 4 & Initial_ALL <= 2,                                    INITIAL_FLAG, .)}) %>%
-    mutate_at("datasets", ~{ifelse( Initial_WHO == 4 & Initial_ALL <= 2,                                    "FLAG"      , .)})
+    mutate(Initial  = ifelse(Initial_WHO == 3 & Initial_ALL != 3,                                 Initial_ALL , Initial ),
+           datasets = ifelse(Initial_WHO == 3 & Initial_ALL != 3,                                 "ALL"       , datasets)) %>%
+    mutate(Initial  = ifelse( is.na(Initial_ALL) | (Initial_ALL == 3 & Initial_WHO != 3),         Initial_WHO , Initial ),
+           datasets = ifelse( is.na(Initial_ALL) | (Initial_ALL == 3 & Initial_WHO != 3),         "WHO"       , datasets)) %>%
+    mutate(Initial  = ifelse( pmax(Initial_WHO, Initial_ALL) <= 2 & Initial_WHO != Initial_ALL,   Initial_WHO , Initial ),
+           datasets = ifelse( pmax(Initial_WHO, Initial_ALL) <= 2 & Initial_WHO != Initial_ALL,   "WHO"       , datasets)) %>%
+    mutate(Initial  = ifelse( Initial_WHO == 4 & Initial_ALL <= 2,                                INITIAL_FLAG, Initial ),
+           datasets = ifelse( Initial_WHO == 4 & Initial_ALL <= 2,                                "FLAG"      , datasets))
   ## Extract additional grading criteria from PREV_VERSION, then prepare to compute the final grades and record additional grading criteria
   ## Note that only one rule is applied per variant-drug pair; those to which a rule has been applied are marked by setting anyRule to TRUE
   inputTab = inputTab %>%
@@ -166,7 +166,7 @@ applyGradingRules = function(inputTab, auxData) {
   inputTab = inputTab %>%
     mutate(rule_silent = (effect_ALL %in% SILENT_EFFECTS                                                                    & Initial == 3)) %>%
     applyNamedRule("rule_silent") %>%
-    mutate_at(str_subset(colnames(.), "SOLO"), ~{ifelse(Rule_Final == ruleEndNum("rule_silent"), NA, .)})
+    mutate(across(matches("SOLO"), ~ifelse(Rule_Final == ruleEndNum("rule_silent"), NA, .)))
   ## Upgrade any non-silent variant in the RRDR region to grade 2
   inputTab = inputTab %>%
     mutate(rule_RRDR = (gene == RRDR_GENE & (pos1_ALL %in% RRDR_INT | pos2_ALL %in% RRDR_INT) & !effect_ALL %in% SILENT_EFFECTS & Initial == 3)) %>%
@@ -231,7 +231,7 @@ applyGradingRules = function(inputTab, auxData) {
   commentSingleTab   = auxData$commentSingleTab
   inputTab = inputTab %>%
     full_join(commentLoF,         by = c("drug", "gene")) %>%
-    mutate_at("comment",    ~{ifelse(!(effect_ALL %in% POOLED_EFFECTS[["LoF"]]), NA,  .)}) %>%
+    mutate(comment = ifelse(!(effect_ALL %in% POOLED_EFFECTS[["LoF"]]), NA, comment)) %>%
     full_join(commentCategoryTab, by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
     adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
     full_join(commentSingleTab  , by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
@@ -239,10 +239,10 @@ applyGradingRules = function(inputTab, auxData) {
     dplyr::filter(!is.na(variant))
   ## Specify PMIDs that lead to a downgrade by the first 'proper' rule:
   inputTab = inputTab %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug == "Bedaquiline"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(28031270, 34503982)), .)}) %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug %in% LEV_MXF          & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(28137812),              .)}) %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug %in% FIRST_LINE_DRUGS & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(32143680),           .)}) %>%
-    mutate_at("Additional grading criteria", ~{ifelse(drug == "Cycloserine"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(27064254, 28971867)), .)})
+    mutate(`Additional grading criteria` = ifelse(drug == "Bedaquiline"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(28031270, 34503982)), `Additional grading criteria`)) %>%
+    mutate(`Additional grading criteria` = ifelse(drug %in% LEV_MXF          & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(28137812),              `Additional grading criteria`)) %>%
+    mutate(`Additional grading criteria` = ifelse(drug %in% FIRST_LINE_DRUGS & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(32143680),              `Additional grading criteria`)) %>%
+    mutate(`Additional grading criteria` = ifelse(drug == "Cycloserine"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(27064254, 28971867)), `Additional grading criteria`))
   ## Remove variant addition variables
   inputTab = inputTab %>%
     select(-starts_with("add_"))
@@ -257,7 +257,7 @@ applyGradingRules = function(inputTab, auxData) {
   inputTab = inputTab %>%
     mutate(Initial = GRADES[Initial], Final = GRADES[Final])
   inputTab = inputTab %>%
-    mutate_at("variant", ~{ifelse(. == "RRDR_LoF", "RRDR", .)})
+    mutate(variant = ifelse(variant == "RRDR_LoF", "RRDR", variant))
   inputTab
 }
 
@@ -293,7 +293,7 @@ applyCrossResistanceRules = function(inputTab, iteration = 1, initRule = 0) {
       ungroup() %>%
       dplyr::filter(add_variant & drug %in% curDrugs) %>%
       mutate(drug = curDrugs[3 - match(drug, curDrugs)], Initial = 3, `Additional grading criteria` = NA_character_) %>%
-      mutate_at(numColumns, ~{ NA_real_ }) %>%
+      mutate(across(all_of(numColumns), ~NA_real_)) %>%
       mutate(across(starts_with('rule'), ~{ FALSE })) %>%
       mutate(anyRule = FALSE)
     inputTab = inputTab %>%
@@ -319,18 +319,18 @@ applyExpertRule = function(inputTab, ruleColumn, description = NA, finalGrade = 
   }
   if (!all(is.na(description))) { ### OCT 8, 2025: Change to allow description to be a vector; only use non-missing values when the rule applies
     inputTab = inputTab %>%
-      mutate_at("Additional grading criteria", ~{ifelse(applyRule & !is.na(description), description, .)})
+      mutate(`Additional grading criteria` = ifelse(applyRule & !is.na(description), description, `Additional grading criteria`))
   }
   if (!is.na(finalGrade)) {
     inputTab = inputTab %>%
-      mutate_at("Final",                       ~{ifelse(applyRule, finalGrade, .)})
+      mutate(Final      = ifelse(applyRule, finalGrade, Final))
   }
   if (!is.na(finalRule)) {
     inputTab = inputTab %>%
-      mutate_at("Rule_Final",                  ~{ifelse(applyRule, finalRule, .)})
+      mutate(Rule_Final = ifelse(applyRule, finalRule, Rule_Final))
   }
   inputTab = inputTab %>%
-    mutate_at("anyRule",                       ~{or(., applyRule)}) %>%
+    mutate(anyRule = or(anyRule, applyRule)) %>%
     select(-applyRule)
   inputTab
 }

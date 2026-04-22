@@ -37,15 +37,15 @@ summarizeEpiGroup = function(df, groupByCols, extraCols) {
 computeEpistasisStats = function(fullDataset) {
   fullDataset %<>%
     mutate(excludeEpi_Candidate = FALSE, excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE) %>%
-    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-    mutate_at("excludeEpi_Candidate", ~{ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[["LoF"]]), .)}) %>%
-    mutate_at("excludeEpi_Regular"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
-                                        ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                        ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))}) %>%
-    mutate_at("excludeEpi_Relaxed"  , ~{ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
-                                        ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                        ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= 2, TRUE, .)))})
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[["LoF"]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Regular   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
+                                  ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= 2, TRUE, excludeEpi_Regular)))) %>%
+    mutate(excludeEpi_Relaxed   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
+                                  ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= 2, TRUE, excludeEpi_Relaxed))))
   fullDataset %<>% ungroup()
   epiTabs = vector("list", 4) %>%
     magrittr::set_names(c("AMI", "KAN", paste0("BDQ_", STRATIFY_BDQ_GENES)))
@@ -167,9 +167,9 @@ computeSensSpec = function(fullDataset,
     ungroup()
   fullDataset %<>%
     mutate(Final_Relaxed = Final) %>%
-    mutate_at("Final",         ~{ifelse(is.na(.)  & !het         & (RRDR_NON_SILENT | LoF_candidate), 2, .)}) %>%
-    mutate_at("Final_Relaxed", ~{ifelse(is.na(.)  & !het_relaxed & (RRDR_NON_SILENT | LoF_candidate), 2, .)}) %>%
-    mutate_at(c("Final", "Final_Relaxed"), ~{replace_na(., 3)}) %>%
+    mutate(Final         = ifelse(is.na(Final)         & !het         & (RRDR_NON_SILENT | LoF_candidate), 2, Final        )) %>%
+    mutate(Final_Relaxed = ifelse(is.na(Final_Relaxed) & !het_relaxed & (RRDR_NON_SILENT | LoF_candidate), 2, Final_Relaxed)) %>%
+    mutate(across(c(Final, Final_Relaxed), ~replace_na(., 3))) %>%
     select(-pos1, -pos2, -LoF_candidate)
   fullDataset %<>%
     group_by(sample_id, drug)
@@ -190,10 +190,10 @@ computeSensSpec = function(fullDataset,
   ## The computation below adds MAX_GRADE to any het variant so that any group of interest (1, 2 or 3) can only get determined by relevant non-hets
   fullDataset = fullDataset %>%
     mutate(Group_Regular = min(Final + het * MAX_GRADE), Group_Relaxed = min(Final_Relaxed + het_relaxed * MAX_GRADE)) %>%
-    mutate_at(c("Group_Regular", "Group_Relaxed"), ~{ifelse(. >= 3, . + 1, .)}) %>%
+    mutate(across(c(Group_Regular, Group_Relaxed), ~ifelse(. >= 3, . + 1, .))) %>%
     mutate(extendedCandidate = (!is.na(effect) & effect != "upstream_gene_variant" & drug_short == "INH" & gene == "katG" & Final == 3)) %>%
-    mutate_at("Group_Regular", ~{ifelse(any(variant %in% COMPENSATORY) & any((!het)         & extendedCandidate & . == 4), 3, .)}) %>%
-    mutate_at("Group_Relaxed", ~{ifelse(any(variant %in% COMPENSATORY) & any((!het_relaxed) & extendedCandidate & . == 4), 3, .)}) %>%
+    mutate(Group_Regular = ifelse(any(variant %in% COMPENSATORY) & any((!het)         & extendedCandidate & Group_Regular == 4), 3, Group_Regular)) %>%
+    mutate(Group_Relaxed = ifelse(any(variant %in% COMPENSATORY) & any((!het_relaxed) & extendedCandidate & Group_Relaxed == 4), 3, Group_Relaxed)) %>%
     select(-extendedCandidate)
   if (safe) { 
     stopifnot(all(testConsistent(fullDataset, groupingVars = c("sample_id", "drug"), consistentVars = c("Group_Regular", "Group_Relaxed"))[[1]])) 
@@ -244,7 +244,7 @@ computeSensSpec = function(fullDataset,
             }
           }
           curTab %<>% 
-            mutate_at("selected", ~{convertToLogical(.)}) %>%
+            mutate(selected = convertToLogical(selected)) %>%
             ungroup()
           if (saveIntermed) {
             write_csv(curTab, file = paste0("SensSpec_Intermediate_RIF", geno, "_", ifelse(relax, "Relaxed", "Regular"), "_Group", stage, "_Lineage", Lineage, ".csv"))

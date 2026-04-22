@@ -133,7 +133,7 @@ runSOLOPipeline = function(inputTab, maxIter, stage = NULL, removeSOnly = TRUE, 
   ## Update the outputs for compatibility with the original format and return them
   outputs %<>%
     rename(variant = "mutation") %>%
-    mutate_at("class", ~{recode(as.factor(.), !!!CODE_KEY) %>% as.character()}) %>%
+    mutate(class = recode(as.factor(class), !!!CODE_KEY) %>% as.character()) %>%
     mutate(Scnt = Tcnt - Rcnt, Tcnt = NULL)
   if (!is.null(stage)) {
     outputs %<>%
@@ -143,7 +143,7 @@ runSOLOPipeline = function(inputTab, maxIter, stage = NULL, removeSOnly = TRUE, 
   }
   outputs = list(classes = outputs)
   if (listIsolates) {
-    outputs %<>% c(list(isolates = isoLists %>% mutate_at('sample_id', as.integer)))
+    outputs %<>% c(list(isolates = isoLists %>% mutate(sample_id = as.integer(sample_id))))
   }
   outputs
 }
