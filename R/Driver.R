@@ -312,18 +312,28 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
   applyManualChecks(finalCatalog, manual_check_results)
 }
 
-#' Augment the final catalogue with orphan and lineage breakdown counts
+#' @noRd
+addLineageCols = function(tab, lineageTab, suffix = "") {
+  nBefore = ncol(tab)
+  result = tab %>%
+    left_join(lineageTab, by = "sample_id") %>%
+    pivot_wider(names_from = lineage, values_from = lineage,
+                values_fill = list(lineage = 0), values_fn = length)
+  colnames(result)[-(1:nBefore)] = paste0("lineage_", colnames(result)[-(1:nBefore)], suffix)
+  result
+}
+
+#' Augment the final catalogue with orphan and lineage breakdown counts (both with and without orphans)
 #' @noRd
 augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, DATA_DIRECTORY, EXTRACTION_ID, minMAF, minQ, OUTPUT_DIRECTORY) {
   orphanTab  = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID, minMAF = minMAF, minQ = minQ)
   lineageTab = getLineageData(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRUE)
-  mainTab = fullDataset[["MAIN"]]
-  fullTab = mainTab %>%
+  mainTab            = fullDataset[["MAIN"]]
+  fullTab            = addLineageCols(mainTab, lineageTab, suffix = "_withPheno")
+  fullTabWithOrphans = fullTab %>%
     bind_rows(orphanTab) %>%
-    left_join(lineageTab, by = "sample_id") %>%
-    pivot_wider(names_from = lineage, values_from = lineage, values_fill = list(lineage = 0), values_fn = length)
-  colnames(fullTab)[-(1:ncol(mainTab))] = paste0("lineage_", colnames(fullTab)[-(1:ncol(mainTab))])
-  fullCounts = fullTab %>%
+    addLineageCols(lineageTab)
+  fullCounts = fullTabWithOrphans %>%
     dplyr::filter(!het & !(sample_id %in% samplesToExclude$sample_id)) %>%
     group_by(drug, variant) %>%
     summarise(across(starts_with('lineage'), sum),
@@ -333,7 +343,8 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
     mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)}))
   cnames = colnames(finalCatalog)
   countNames = cnames[str_detect(cnames, "lineage_")]
-  countNames = countNames[order(str_remove(countNames, "lineage_") %>% as.numeric())]
+  countOrder = order(str_remove(countNames, "lineage_") %>% str_remove("_withPheno") %>% as.numeric())
+  countNames = countNames[countOrder]
   cnames = c(setdiff(cnames, countNames), countNames)
   finalCatalog = finalCatalog %>%
     select(all_of(cnames))
