@@ -328,12 +328,11 @@ addLineageCols = function(tab, lineageTab, suffix = "") {
 augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, DATA_DIRECTORY, EXTRACTION_ID, minMAF, minQ, OUTPUT_DIRECTORY) {
   orphanTab  = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID, minMAF = minMAF, minQ = minQ)
   lineageTab = getLineageData(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRUE)
-  mainTab            = fullDataset[["MAIN"]]
-  fullTab            = addLineageCols(mainTab, lineageTab, suffix = "_withPheno")
-  fullTabWithOrphans = fullTab %>%
+  mainTab    = fullDataset[["MAIN"]] %>%
+    addLineageCols(lineageTab, suffix = "_withPheno") %>%
     bind_rows(orphanTab) %>%
     addLineageCols(lineageTab)
-  fullCounts = fullTabWithOrphans %>%
+  fullCounts = mainTab %>%
     dplyr::filter(!het & !(sample_id %in% samplesToExclude$sample_id)) %>%
     group_by(drug, variant) %>%
     summarise(across(starts_with('lineage'), sum),
