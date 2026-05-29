@@ -307,7 +307,7 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
   finalCatalog = finalCatalog %>%
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
   manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE, locale = readr::locale(encoding = "latin1")) %>%
-    mutate_all(~{str_replace_all(str_trim(.), " ", "")}) %>%
+    mutate_all(~{str_trim(str_replace_all(., " ", " "))}) %>%
     select(1, 3, 4, 5) %>%
     set_colnames(c("drug", "variant", "Supplementary_Grading_Considerations", "Final_Confidence_Grading")) %>%
     mutate(Supplementary_Grading_Considerations = str_replace(Supplementary_Grading_Considerations, "Additional grading evidence", "Evidence"))

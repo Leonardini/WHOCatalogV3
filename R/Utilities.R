@@ -150,8 +150,8 @@ recodeValues = function(initTab, manualTab) {
 #' @noRd
 adjustDuplicateColumns = function(initTab, suffixes = c(".x", ".y"), warn = TRUE, add = FALSE) {
   coln = colnames(initTab)
-  coln1 = coln[str_ends(coln, suffixes[1])]
-  coln2 = coln[str_ends(coln, suffixes[2])]
+  coln1 = coln[str_ends(coln, fixed(suffixes[1]))]
+  coln2 = coln[str_ends(coln, fixed(suffixes[2]))]
   coln1Short = str_sub(coln1, end = -(nchar(suffixes[1]) + 1))
   coln2Short = str_sub(coln2, end = -(nchar(suffixes[2]) + 1))
   stopifnot(all(sort(coln1Short) == sort(coln2Short)))
