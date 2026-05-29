@@ -71,10 +71,10 @@ loadGradingAuxData = function(dir) {
       dplyr::filter(nchar(mutation) == 1) %>%
       mutate(Final = as.integer(mutation)) %>%
       select(-mutation),
-    commentLoF         = commentTab %>%
+    commentLoF           = commentTab %>%
       dplyr::filter(str_starts(mutation, "any LoF")) %>%
       select(-mutation),
-    commentSingleTab   = commentTab %>%
+    commentSingleTab     = commentTab %>%
       dplyr::filter(nchar(mutation) > 1 & !str_starts(mutation, "any LoF"))
   )
 }
@@ -226,15 +226,15 @@ applyGradingRules = function(inputTab, auxData) {
     mutate(rule_prev_evidence = (!is.na(Final_prev_version) & Final_prev_version < 3 & (!effect_ALL %in% INFRAME_EFFECTS) & Initial == 3)) %>%
     applyExpertRule("rule_prev_evidence", description = PREV_EVIDENCE, finalGrade = FINAL_FLAG, finalRule = prevGuidanceRule + 0.5)
   ## Add comment column to a specified list of mutations or mutation categories, provided they were initially graded 3 and no other rule has applied:
-  commentCategoryTab = auxData$commentCategoryTab
-  commentLoF         = auxData$commentLoF
-  commentSingleTab   = auxData$commentSingleTab
+  commentCategoryTab   = auxData$commentCategoryTab
+  commentLoF           = auxData$commentLoF
+  commentSingleTab     = auxData$commentSingleTab
   inputTab = inputTab %>%
-    full_join(commentLoF,         by = c("drug", "gene")) %>%
+    full_join(commentLoF,           by = c("drug", "gene")) %>%
     mutate(comment = ifelse(!(effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]]), NA, comment)) %>%
-    full_join(commentCategoryTab, by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
+    full_join(commentCategoryTab,   by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
     adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
-    full_join(commentSingleTab  , by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
+    full_join(commentSingleTab,     by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
     adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
     dplyr::filter(!is.na(variant))
   ## Specify PMIDs that lead to a downgrade by the first 'proper' rule:

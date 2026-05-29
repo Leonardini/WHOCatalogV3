@@ -307,7 +307,9 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
   finalCatalog = finalCatalog %>%
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
   manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE) %>%
-    select(drug, variant, Supplementary_Grading_Considerations, Final_Confidence_Grading) %>%
+    mutate_all(~{str_replace_all(str_trim(.), " ", "")}) %>%
+    select(1, 3, 4, 5) %>%
+    set_colnames(c("drug", "variant", "Supplementary_Grading_Considerations", "Final_Confidence_Grading")) %>%
     mutate(Supplementary_Grading_Considerations = str_replace(Supplementary_Grading_Considerations, "Additional grading evidence", "Evidence"))
   applyManualChecks(finalCatalog, manual_check_results)
 }
@@ -329,7 +331,7 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
   orphanTab  = getOrphanData(DATA_DIRECTORY, EXTRACTION_ID, minMAF = minMAF, minQ = minQ)
   lineageTab = getLineageData(DATA_DIRECTORY, EXTRACTION_ID, useSublineageData = TRUE)
   mainTab    = fullDataset[["MAIN"]] %>%
-    addLineageCols(lineageTab, suffix = "_withPheno") %>%
+    # addLineageCols(lineageTab, suffix = "_withPheno") %>%
     bind_rows(orphanTab) %>%
     addLineageCols(lineageTab)
   fullCounts = mainTab %>%
@@ -337,9 +339,26 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
     group_by(drug, variant) %>%
     summarise(across(starts_with('lineage'), sum),
               count = n(), orphan_count = sum(phenotype == "U"), .groups = "drop")
+  variantDenominators = fullDataset[["MAIN"]] %>%
+    distinct(drug, variant, RDen, SDen) %>%
+    mutate(anyPhenoDen = RDen + SDen)
+  drugDenominators = fullDataset[["MAIN"]] %>%
+    anti_join(BAD_VAR_DRUG_PAIRS, by = c("drug", "variant")) %>%
+    distinct(drug, RDen, SDen) %>%
+    mutate(anyPhenoDen = RDen + SDen)
+  uDenominators = orphanTab %>%
+    distinct(drug, sample_id) %>%
+    group_by(drug) %>%
+    summarise(UDen = n(), .groups = "drop")
   finalCatalog = finalCatalog %>%
     full_join(fullCounts, by = c("drug", "variant")) %>%
-    mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)}))
+    mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)})) %>%
+    left_join(variantDenominators, by = c("drug", "variant")) %>%
+    left_join(drugDenominators, by = "drug") %>%
+    adjustDuplicateColumns(warn = FALSE, add = FALSE) %>%
+    left_join(uDenominators, by = "drug") %>%
+    mutate(across(c(RDen, SDen, anyPhenoDen, UDen), ~replace_na(., 0L)),
+           totalDen = anyPhenoDen + UDen)
   cnames = colnames(finalCatalog)
   countNames = cnames[str_detect(cnames, "lineage_")]
   countOrder = order(str_remove(countNames, "lineage_") %>% str_remove("_withPheno") %>% as.numeric())

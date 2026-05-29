@@ -46,9 +46,9 @@ make_aux_data <- function() {
                                 Final_prev_version = integer()),
     commentCategoryTab = tibble(drug = character(), gene = character(),
                                 Final = integer(), comment = character()),
-    commentLoF         = tibble(drug = character(), gene = character(), comment = character()),
-    commentSingleTab   = tibble(drug = character(), gene = character(),
-                                mutation = character(), comment = character())
+    commentLoF           = tibble(drug = character(), gene = character(), comment = character()),
+    commentSingleTab     = tibble(drug = character(), gene = character(),
+                                  mutation = character(), comment = character())
   )
 }
 
