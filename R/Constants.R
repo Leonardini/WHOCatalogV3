@@ -128,6 +128,8 @@ STATS_FILE_PREFIX             = "Stats_"
 GRADED_CATALOGUE_PREFIX       = "Final_graded_algorithm_catalogue"
 COMPLETE_DATASET_FILENAME     = "CompleteDataset.csv"
 COMPLETE_DATASET_WHO_FILENAME = "CompleteDatasetWHO.csv"
+TRUE_COUNT_COLUMNS            = c("present_ALL", "present_R_ALL", "present_S_ALL", "absent_R_ALL", "absent_S_ALL",
+                                  "present_WHO", "present_R_WHO", "present_S_WHO", "absent_R_WHO", "absent_S_WHO")
 
 ## Process-specific tables
 ## PHENO_GROUPS    = tibble(category_phenotype = c("ALL", "WHO", "CC", "CC-ATU"), group = c("MAIN", "MAIN", "CC", "ATU"))

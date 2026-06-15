@@ -254,6 +254,23 @@ runSOLOPipelinePerDataset = function(fullDataset, samplesToExclude, OUTPUT_DIREC
   list(fullDataset = fullDataset, stageStats = stageStats)
 }
 
+#' Assemble the final catalogue from the per-stage graded tables, keeping each variant at the stage it was graded
+#' @noRd
+assembleStagedCatalog = function(stageCatalogs) {
+  trueCounts = stageCatalogs[[1]] %>%
+    distinct(drug, variant, .keep_all = TRUE) %>%
+    select(drug, variant, all_of(TRUE_COUNT_COLUMNS))
+  finalCatalog = tibble()
+  for (curStage in seq_along(stageCatalogs)) {
+    curSubCatalog = stageCatalogs[[curStage]] %>%
+      dplyr::filter(stage == curStage | (curStage == 3 & (stage == 4 | is.na(stage)) & !is.na(drug)))
+    finalCatalog = finalCatalog %>%
+      bind_rows(curSubCatalog)
+  }
+  finalCatalog %>%
+    rows_update(trueCounts %>% semi_join(finalCatalog, by = c("drug", "variant")), by = c("drug", "variant"))
+}
+
 #' Grade mutations stage by stage and assemble the final catalogue
 #' @noRd
 computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NON_DATABASE_DIRECTORY, correct_all) {
@@ -297,14 +314,8 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
     gradedCatalog = gradeMutations(LoF = LoF, NON_DATABASE_DIRECTORY = str_remove(NON_DATABASE_DIRECTORY, "/$"), stage = curStage, outDir = OUTPUT_DIRECTORY)
   }
   catalogFiles = file.path(OUTPUT_DIRECTORY, paste0(GRADED_CATALOGUE_PREFIX, "_", Sys.Date(), WITHLOFS_SUFFIX, "_Stage", 1:3, ".csv"))
-  finalCatalog = tibble()
-  for (curStage in 1:3) {
-    curSubCatalog = read_csv(catalogFiles[curStage]) %>%
-      dplyr::filter(stage == curStage | (curStage == 3 & (stage == 4 | is.na(stage)) & !is.na(drug)))
-    finalCatalog = finalCatalog %>%
-      bind_rows(curSubCatalog)
-  }
-  finalCatalog = finalCatalog %>%
+  stageCatalogs = lapply(catalogFiles, read_csv, guess_max = LARGE_NUMBER, show_col_types = FALSE)
+  finalCatalog = assembleStagedCatalog(stageCatalogs) %>%
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
   manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE, locale = readr::locale(encoding = "latin1")) %>%
     mutate_all(~{str_trim(str_replace_all(., " ", " "))}) %>%
