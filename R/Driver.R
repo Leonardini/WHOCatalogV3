@@ -357,19 +357,19 @@ augmentWithLineageData = function(finalCatalog, fullDataset, samplesToExclude, D
     anti_join(BAD_VAR_DRUG_PAIRS, by = c("drug", "variant")) %>%
     distinct(drug, RDen, SDen) %>%
     mutate(anyPhenoDen = RDen + SDen)
-  uDenominators = orphanTab %>%
-    distinct(drug, sample_id) %>%
-    group_by(drug) %>%
-    summarise(UDen = n(), .groups = "drop")
+  cohortSize = bind_rows(fullDataset[["MAIN"]], orphanTab) %>%
+    dplyr::filter(!(sample_id %in% samplesToExclude$sample_id)) %>%
+    distinct(sample_id) %>%
+    nrow()
   finalCatalog = finalCatalog %>%
     full_join(fullCounts, by = c("drug", "variant")) %>%
     mutate(across(starts_with("lineage") | ends_with("count"), ~{ifelse(is.na(.), 0, .)})) %>%
     left_join(variantDenominators, by = c("drug", "variant")) %>%
     left_join(drugDenominators, by = "drug") %>%
     adjustDuplicateColumns(warn = FALSE, add = FALSE) %>%
-    left_join(uDenominators, by = "drug") %>%
-    mutate(across(c(RDen, SDen, anyPhenoDen, UDen), ~replace_na(., 0L)),
-           totalDen = anyPhenoDen + UDen)
+    mutate(across(c(RDen, SDen, anyPhenoDen), ~replace_na(., 0L)),
+           totalDen = cohortSize, UDen = totalDen - anyPhenoDen,
+           total_present = count, total_absent = totalDen - count)
   cnames = colnames(finalCatalog)
   countNames = cnames[str_detect(cnames, "lineage_")]
   countOrder = order(str_remove(countNames, "lineage_") %>% str_remove("_withPheno") %>% as.numeric())
