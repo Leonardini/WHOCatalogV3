@@ -104,7 +104,7 @@ computeCompensatoryStats = function(fullDataset) {
     magrittr::set_names(LETTERS[1:6])
   allTabs[["A"]] = miniTab1
   allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= RESISTANCE_GRADE_MAX & !het_strict))
-  allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr")) & !het_strict))
+  allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr")) & Final <= RESISTANCE_GRADE_MAX & !het_strict))
   allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= RESISTANCE_GRADE_MAX | effect %in% POOLED_EFFECTS[[LOF_LABEL]]) & !het_strict))
   allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant") & !het_strict))
   allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS) & !het_strict))
