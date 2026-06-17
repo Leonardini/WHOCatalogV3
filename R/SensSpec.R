@@ -37,15 +37,15 @@ summarizeEpiGroup = function(df, groupByCols, extraCols) {
 computeEpistasisStats = function(fullDataset) {
   fullDataset %<>%
     mutate(excludeEpi_Candidate = FALSE, excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short == "AMI"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short == "KAN"            , any(!het_strict & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
-    mutate(excludeEpi_Candidate = ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het_strict & gene == "mmpL5" & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "AMI"            , any(!het & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short == "KAN"            , any(!het & gene == "eis"   & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
+    mutate(excludeEpi_Candidate = ifelse(drug_short %in% c("BDQ", "CFZ"), any(!het & gene == "mmpL5" & effect %in% POOLED_EFFECTS[[LOF_LABEL]]), excludeEpi_Candidate)) %>%
     mutate(excludeEpi_Regular   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het         & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
                                   ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het         & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX, TRUE, excludeEpi_Regular)))) %>%
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het         & gene    %in% BDQ_GENE, TRUE, excludeEpi_Regular)))) %>%
     mutate(excludeEpi_Relaxed   = ifelse(excludeEpi_Candidate & drug_short == "AMI"             & !het_relaxed & variant %in% EXCLUDE_SET[["AMI"]],  TRUE,
                                   ifelse(excludeEpi_Candidate & drug_short == "KAN"             & !het_relaxed & variant %in% EXCLUDE_SET[["KAN"]],  TRUE,
-                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE & Final <= RESISTANCE_GRADE_MAX, TRUE, excludeEpi_Relaxed))))
+                                  ifelse(excludeEpi_Candidate & drug_short %in% c("BDQ", "CFZ") & !het_relaxed & gene    %in% BDQ_GENE, TRUE, excludeEpi_Relaxed))))
   fullDataset %<>% ungroup()
   epiTabs = vector("list", 4) %>%
     magrittr::set_names(c("AMI", "KAN", paste0("BDQ_", STRATIFY_BDQ_GENES)))
@@ -103,11 +103,11 @@ computeCompensatoryStats = function(fullDataset) {
   allTabs = vector("list", 6) %>%
     magrittr::set_names(LETTERS[1:6])
   allTabs[["A"]] = miniTab1
-  allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= RESISTANCE_GRADE_MAX))
-  allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr"))))
-  allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= RESISTANCE_GRADE_MAX | effect %in% POOLED_EFFECTS[[LOF_LABEL]])))
-  allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant")))
-  allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS)))
+  allTabs[["B"]] = miniTab1 %<>% dplyr::filter(!any(gene == "inhA" & Final <= RESISTANCE_GRADE_MAX & !het_strict))
+  allTabs[["C"]] = miniTab1 %<>% dplyr::filter(!any(variant %in% paste0("katG_p.Ser315", c("Arg", "Asn", "Gly", "Ile", "Thr")) & !het_strict))
+  allTabs[["D"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & (Final <= RESISTANCE_GRADE_MAX | effect %in% POOLED_EFFECTS[[LOF_LABEL]]) & !het_strict))
+  allTabs[["E"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS | effect == "upstream_gene_variant") & !het_strict))
+  allTabs[["F"]] = miniTab1 %<>% dplyr::filter(!any(gene == "katG" & Final == 3 & !(effect %in% SILENT_EFFECTS) & !het_strict))
   compTabs[["INH"]] = allTabs
   fullDataset %<>% group_by(sample_id, drug)
   list(fullDataset = fullDataset, compTabs = compTabs)
@@ -188,8 +188,12 @@ computeSensSpec = function(fullDataset,
   }
   ## Assign the final "regular" and "relaxed" groups to each sample; NB: samples flagged for epistasis will be counted as not fitting the catalogue criteria
   ## The computation below adds MAX_GRADE to any het variant so that any group of interest (1, 2 or 3) can only get determined by relevant non-hets
+  if (!"excludeEpi_Regular" %in% colnames(fullDataset)) {
+    fullDataset = fullDataset %>%
+      mutate(excludeEpi_Regular = FALSE, excludeEpi_Relaxed = FALSE)
+  }
   fullDataset = fullDataset %>%
-    mutate(Group_Regular = min(Final + het * MAX_GRADE), Group_Relaxed = min(Final_Relaxed + het_relaxed * MAX_GRADE)) %>%
+    mutate(Group_Regular = min(Final + (het | excludeEpi_Regular) * MAX_GRADE), Group_Relaxed = min(Final_Relaxed + (het_relaxed | excludeEpi_Relaxed) * MAX_GRADE)) %>%
     mutate(across(c(Group_Regular, Group_Relaxed), ~ifelse(. >= 3, . + 1, .))) %>%
     mutate(extendedCandidate = (!is.na(effect) & effect != "upstream_gene_variant" & drug_short == "INH" & gene == "katG" & Final == 3)) %>%
     mutate(Group_Regular = ifelse(any(variant %in% COMPENSATORY) & any((!het)         & extendedCandidate & Group_Regular == 4), 3, Group_Regular)) %>%
@@ -197,8 +201,8 @@ computeSensSpec = function(fullDataset,
     select(-extendedCandidate)
   if (safe) { 
     stopifnot(all(testConsistent(fullDataset, groupingVars = c("sample_id", "drug"), consistentVars = c("Group_Regular", "Group_Relaxed"))[[1]])) 
-    if (useLineageData) {
-      stopifnot(all(testConsistent(fullDataset, groupingVars = c("sample_id"), consistentVars = c("lineage"))[[1]])) 
+    if ("lineage" %in% colnames(fullDataset)) {
+      stopifnot(all(testConsistent(fullDataset, groupingVars = c("sample_id"), consistentVars = c("lineage"))[[1]]))
     }
   }
   fullDataset = fullDataset %>%

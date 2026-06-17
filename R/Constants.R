@@ -192,7 +192,7 @@ STAGES   = c(1, 2, 3, 12, 123)
 EXCLUDE_SET = vector("list", 5)
 EXCLUDE_SET[["AMI"]]     =                         paste0("eis_c.", "-14C>T")
 EXCLUDE_SET[["AMI_EXT"]] =   EXCLUDE_SET[["AMI"]]
-EXCLUDE_SET[["KAN"]]     = c(EXCLUDE_SET[["AMI"]], paste0("eis_c.", "-10G>A"))
-EXCLUDE_SET[["KAN_EXT"]] = c(EXCLUDE_SET[["KAN"]], paste0("eis_c.", c("-12C>T", "-37G>T", "-8delC")))
+EXCLUDE_SET[["KAN"]]     = c(EXCLUDE_SET[["AMI"]], paste0("eis_c.", c("-10G>A", "-12C>T", "-37G>T", "-8delC")))
+EXCLUDE_SET[["KAN_EXT"]] =   EXCLUDE_SET[["KAN"]]
 EXCLUDE_SET[["BOTH"]]    =                         paste0("rrs_n.", c("1401A>G", "1402C>T", "1484G>T"))
 
