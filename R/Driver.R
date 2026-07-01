@@ -85,6 +85,17 @@ computeExcludedCounts = function(curSet, samplesToExclude, datasetName) {
   list(extraCounts = curExtraCounts, extraSolos = curExtraSolos)
 }
 
+#' Load and clean the manual grading overrides file
+#' @noRd
+loadManualChecks = function(NON_DATABASE_DIRECTORY) {
+  read_csv(paste0(str_remove(NON_DATABASE_DIRECTORY, "/$"), "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE, locale = readr::locale(encoding = "latin1")) %>%
+    mutate_all(~{str_trim(str_replace_all(., "\u00a0", " "))}) %>%
+    select(1, 3, 4, 5) %>%
+    set_colnames(c("drug", "variant", "Supplementary_Grading_Considerations", "Final_Confidence_Grading")) %>%
+    mutate(variant = str_remove_all(variant, "\\s")) %>%
+    mutate(Supplementary_Grading_Considerations = str_replace(Supplementary_Grading_Considerations, "Additional grading evidence", "Evidence"))
+}
+
 #' Apply manual grading overrides to the final catalogue
 #' @noRd
 applyManualChecks = function(finalCatalog, manualCheckResults) {
@@ -317,11 +328,7 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
   stageCatalogs = lapply(catalogFiles, read_csv, guess_max = LARGE_NUMBER, show_col_types = FALSE)
   finalCatalog = assembleStagedCatalog(stageCatalogs) %>%
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
-  manual_check_results = read_csv(paste0(NON_DATABASE_DIRECTORY, "/manual_check.csv"), guess_max = LARGE_NUMBER, show_col_types = FALSE, locale = readr::locale(encoding = "latin1")) %>%
-    mutate_all(~{str_trim(str_replace_all(., " ", " "))}) %>%
-    select(1, 3, 4, 5) %>%
-    set_colnames(c("drug", "variant", "Supplementary_Grading_Considerations", "Final_Confidence_Grading")) %>%
-    mutate(Supplementary_Grading_Considerations = str_replace(Supplementary_Grading_Considerations, "Additional grading evidence", "Evidence"))
+  manual_check_results = loadManualChecks(NON_DATABASE_DIRECTORY)
   applyManualChecks(finalCatalog, manual_check_results)
 }
 

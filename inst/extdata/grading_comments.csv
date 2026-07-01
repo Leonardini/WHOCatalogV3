@@ -1,4 +1,4 @@
-﻿Drug,Gene,Variant,Comment
+Drug,Gene,Variant,Comment
 Isoniazid,katG,any AwR,High-level resistance
 Isoniazid,katG,any AwRI,High-level resistance
 Isoniazid,inhA,any AwR,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance)"
