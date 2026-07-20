@@ -60,6 +60,8 @@ loadGradingAuxData = function(dir) {
     mutate_all(~{trimws(., whitespace = "[\\h\\v]")}) %>%
     select(1:4) %>%
     set_colnames(c("drug", "gene", "mutation", "comment")) %>%
+    mutate(exceptEffect = str_match(mutation, "^any .+ except (.+)$")[, 2]) %>%
+    mutate(mutation = str_remove(mutation, " except .+$")) %>%
     mutate(temp = match(mutation, c("any AwR", "any AwRI", "any Uncertain", "any nAwRI", "any nAwR"))) %>%
     mutate(mutation = ifelse(!is.na(temp), temp, mutation)) %>%
     select(-temp)
@@ -73,10 +75,34 @@ loadGradingAuxData = function(dir) {
       select(-mutation),
     commentLoF           = commentTab %>%
       dplyr::filter(str_starts(mutation, "any LoF")) %>%
-      select(-mutation),
+      select(-mutation, -exceptEffect),
     commentSingleTab     = commentTab %>%
-      dplyr::filter(nchar(mutation) > 1 & !str_starts(mutation, "any LoF"))
+      dplyr::filter(nchar(mutation) > 1 & !str_starts(mutation, "any LoF")) %>%
+      select(-exceptEffect)
   )
+}
+
+#' Attach grading comments to a table of graded variants
+#'
+#' Variants added by expert rules carry no parsed \code{gene} or \code{mutation}, so both are
+#' backfilled from the variant name before the comment tables are joined.
+#' @param inputTab A table of graded variants with integer \code{Final} grades.
+#' @param auxData Auxiliary grading data as returned by \code{loadGradingAuxData}.
+#' @return \code{inputTab} with a \code{comment} column.
+#' @noRd
+applyComments = function(inputTab, auxData) {
+  inputTab %>%
+    mutate(gene     = ifelse(is.na(gene),     str_remove(variant, "_.*$"),    gene    )) %>%
+    mutate(mutation = ifelse(is.na(mutation), str_remove(variant, "^[^_]*_"), mutation)) %>%
+    full_join(auxData$commentLoF,         by = c("drug", "gene")) %>%
+    mutate(comment = ifelse(!(effect_ALL %in% c(POOLED_EFFECTS[[LOF_LABEL]], LOF_LABEL)), NA, comment)) %>%
+    full_join(auxData$commentCategoryTab, by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
+    mutate(comment.z = ifelse(!is.na(exceptEffect) & !is.na(effect_ALL) & effect_ALL == exceptEffect, NA, comment.z)) %>%
+    select(-exceptEffect) %>%
+    adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
+    full_join(auxData$commentSingleTab,   by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
+    adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
+    dplyr::filter(!is.na(variant))
 }
 
 #' Apply grading rules to all variants and write the graded catalogue
@@ -226,17 +252,7 @@ applyGradingRules = function(inputTab, auxData) {
     mutate(rule_prev_evidence = (!is.na(Final_prev_version) & Final_prev_version < 3 & (!effect_ALL %in% INFRAME_EFFECTS) & Initial == 3)) %>%
     applyExpertRule("rule_prev_evidence", description = PREV_EVIDENCE, finalGrade = FINAL_FLAG, finalRule = prevGuidanceRule + 0.5)
   ## Add comment column to a specified list of mutations or mutation categories, provided they were initially graded 3 and no other rule has applied:
-  commentCategoryTab   = auxData$commentCategoryTab
-  commentLoF           = auxData$commentLoF
-  commentSingleTab     = auxData$commentSingleTab
-  inputTab = inputTab %>%
-    full_join(commentLoF,           by = c("drug", "gene")) %>%
-    mutate(comment = ifelse(!(effect_ALL %in% POOLED_EFFECTS[[LOF_LABEL]]), NA, comment)) %>%
-    full_join(commentCategoryTab,   by = c("drug", "gene", "Final"   ), suffix = c(".x", ".z")) %>%
-    adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
-    full_join(commentSingleTab,     by = c("drug", "gene", "mutation"), suffix = c(".x", ".z")) %>%
-    adjustDuplicateColumns(suffixes = c(".x", ".z"), add = TRUE) %>%
-    dplyr::filter(!is.na(variant))
+  inputTab = applyComments(inputTab, auxData)
   ## Specify PMIDs that lead to a downgrade by the first 'proper' rule:
   inputTab = inputTab %>%
     mutate(`Additional grading criteria` = ifelse(drug == "Bedaquiline"      & Rule_Final == ruleEndNum("rule_literature"), describePMIDs(c(28031270, 34503982)), `Additional grading criteria`)) %>%

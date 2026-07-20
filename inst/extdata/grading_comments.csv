@@ -14,7 +14,7 @@ Isoniazid,ahpC,c.-52C>A,"Compensatory mutation. If genetically linked with a cod
 Isoniazid,ahpC,c.-54C>T,"Compensatory mutation. If genetically linked with a coding katG Group 3 mutation, upgrade to Group 2 and report high level resistance in a sample that is not already high-level isoniazid resistant"
 Isoniazid,ahpC,c.-77T>A,"Compensatory mutation. If genetically linked with a coding katG Group 3 mutation, upgrade to Group 2 and report high level resistance in a sample that is not already high-level isoniazid resistant"
 Isoniazid,ahpC,c.-48G>A,"Compensatory mutation. If genetically linked with a coding katG Group 3 mutation, upgrade to Group 2 and report high level resistance in a sample that is not already high-level isoniazid resistant"
-Isoniazid,katG,any Uncertain,"If genetically linked with an ahpC compensatory mutation, upgrade to Group 2 and report high-level resistance in a sample that is not already high-level isoniazid resistant"
+Isoniazid,katG,any Uncertain except upstream_gene_variant,"If genetically linked with an ahpC compensatory mutation, upgrade to Group 2 and report high-level resistance in a sample that is not already high-level isoniazid resistant"
 Moxifloxacin,gyrA,p.Ala90Val,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance)"
 Moxifloxacin,gyrA,p.Asp89Asn,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance)"
 Moxifloxacin,gyrA,p.Asp94Ala,"Low-level resistance (multiple, genetically linked low-level resistance mutations are additive and confer high-level resistance)"

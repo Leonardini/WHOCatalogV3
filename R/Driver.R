@@ -329,7 +329,14 @@ computeFinalGrades = function(fullDataset, stageStats, LoF, OUTPUT_DIRECTORY, NO
   finalCatalog = assembleStagedCatalog(stageCatalogs) %>%
     rename(Supplementary_Grading_Considerations = `Additional grading criteria`, Initial_Confidence_Grading = Initial, Final_Confidence_Grading = Final)
   manual_check_results = loadManualChecks(NON_DATABASE_DIRECTORY)
-  applyManualChecks(finalCatalog, manual_check_results)
+  finalCatalog = applyManualChecks(finalCatalog, manual_check_results)
+  ## Manual checks replace the grade after grading assigned comments, so the comments are recomputed against the corrected grades
+  auxData = loadGradingAuxData(str_remove(NON_DATABASE_DIRECTORY, "/$"))
+  finalCatalog %>%
+    mutate(Final = match(Final_Confidence_Grading, GRADES)) %>%
+    select(-comment) %>%
+    applyComments(auxData) %>%
+    select(-Final)
 }
 
 #' @noRd
